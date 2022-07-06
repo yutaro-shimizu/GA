@@ -11,47 +11,33 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
+def load_data():
+  # load data
+  X, y = fetch_openml('mnist_784', version=1, return_X_y=True)
+  X = X / 255 #scale the data
 
-# load data
-X, y = fetch_openml('mnist_784', version=1, return_X_y=True)
-X = X / 255 #scale the data
-
-# use the traditional train/test split
-X_train, X_test = X[:60000], X[60000:]
-y_train, y_test = y[:60000], y[60000:]
-
-# # stochastic gradient descent
-
-# ### check the size of layers: 1 hidden layer w 50 nodes
-# mlp = MLPClassifier(hidden_layer_sizes=(10, ), max_iter=10, alpha=1e-4, 
-#                     solver='sgd', verbose=10, random_state=1, learning_rate_init=.1)
-# mlp.fit(X_train, y_train)
-
-# print(f"Training set score: {mlp.score(X_train, y_train):.3f}")
-# print(f"Test set score: {mlp.score(X_test, y_test):.3f}")
-
-# plt.show()
+  # use the traditional train/test split
+  X_train, X_test = X[:60000], X[60000:]
+  y_train, y_test = y[:60000], y[60000:]
 
 
 ####### 1. Initialization #######
 # setup lists for: NNs and scores
-"""
-Having an original and a copy is essential so not to overwrite while evolution
-"""
-NNs = {}
-NNs_copy = {}
+def initialization():
+  """
+  Having an original and a copy is essential so not to overwrite while evolution
+  """
+  NNs = {}
+  NNs_copy = {}
 
-# initialize NN and score 0 for each individual
-for ind in range(population):
-  NNs[ind] = [MLPClassifier(hidden_layer_sizes=(10,), max_iter=1, alpha=1e-4,
-                          solver='sgd', verbose=10, learning_rate_init=.1),0]
-  NNs[ind][0].fit(X_train, y_train) # fit the network to initialize W and b
+  # initialize NN and score 0 for each individual
+  for ind in range(population):
+    NNs[ind] = [MLPClassifier(hidden_layer_sizes=(10,), max_iter=1, alpha=1e-4,
+                            solver='sgd', verbose=10, learning_rate_init=.1),0]
+    NNs[ind][0].fit(X_train, y_train) # fit the network to initialize W and b
 
-# start training
-for gen in range(generations):
-  print("Current generation: ", gen)
-
-  # ####### 2. Calculate fitness #######
+# ####### 2. Calculate fitness #######
+def calculate():
   print("Calculate fitness")
   score = [] # for display purpose, store scores
   for ind in NNs:
@@ -60,11 +46,13 @@ for gen in range(generations):
   print("Mean score: ", np.mean(score))
   NNs_copy = NNs # clone the population
 
-  ####### 3. Select top 20% #######
+####### 3. Select top 20% #######
+def selection():
   print("Evolution begins")
   lst = dict(sorted(NNs.items(), key = lambda NNs:(NNs[1][1], NNs[0]), reverse=True)) # sort the list for selection
 
-  ####### 4. Evolve top 20% #######
+####### 4. Evolve top 20% #######
+def mutation():
   length = int(population * percent)
 
   children = [[] for i in range(population)] # sublist for each child
@@ -95,20 +83,36 @@ for gen in range(generations):
       child[j] = child_coefs.reshape(prt1.shape) # child of weights and biases
 
     children[i] = child # put child in the population of children
-  print("Evolution complete\n")
 
-  # inject children's W and b to the NN objects
-  for ind in NNs_copy:
-    for layer in range(layers + 1): 
-      NNs_copy[ind][0].coefs_[layer] = children[ind][layer]
-
-  NNs, NNs_copy = NNs_copy, NNs # overwrite the origial copy
 
 ####### 5. Calculate final score #######
-lst = dict(sorted(NNs.items(), key = lambda NNs:(NNs[1][1], NNs[0]), reverse=True)) # sort the list
-final_score = NNs[0][0].score(X_test, y_test) #fit the best model
-print(final_score)
+def score():
+  lst = dict(sorted(NNs.items(), key = lambda NNs:(NNs[1][1], NNs[0]), reverse=True)) # sort the list
+  final_score = NNs[0][0].score(X_test, y_test) #fit the best model
+  print(final_score)
 
 # training vs validation%%!
 # parameters
 # time
+
+def main():
+  load_data()
+  initialization()
+  for gen in range(generations=100):
+    calculate()
+    selection()
+    mutation()
+    print("Evolution complete\n")
+
+    # inject children's W and b to the NN objects
+    for ind in NNs_copy:
+      for layer in range(layers + 1): 
+        NNs_copy[ind][0].coefs_[layer] = children[ind][layer]
+
+    NNs, NNs_copy = NNs_copy, NNs # overwrite the origial copy
+
+  score()
+
+
+if __name__=="__main__":
+  main()
