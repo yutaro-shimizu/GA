@@ -1,4 +1,4 @@
-from 01GA import main
+from GA import main
 
 generations = [10,100,500,1000]
 population = [10,100,500,1000]
