@@ -52,7 +52,7 @@ for gen in range(generations):
   print("Current generation: ", gen)
 
   # ####### 2. Calculate fitness #######
-  print("Calculate fitness🧮")
+  print("Calculate fitness")
   score = [] # for display purpose, store scores
   for ind in NNs:
     NNs[ind][1]= NNs[ind][0].score(X_train, y_train) # calculate the score
@@ -61,7 +61,7 @@ for gen in range(generations):
   NNs_copy = NNs # clone the population
 
   ####### 3. Select top 20% #######
-  print("Evolution begins🦠👩‍🏭")
+  print("Evolution begins")
   lst = dict(sorted(NNs.items(), key = lambda NNs:(NNs[1][1], NNs[0]), reverse=True)) # sort the list for selection
 
   ####### 4. Evolve top 20% #######
@@ -95,7 +95,7 @@ for gen in range(generations):
       child[j] = child_coefs.reshape(prt1.shape) # child of weights and biases
 
     children[i] = child # put child in the population of children
-  print("Evolution complete🦠✨\n")
+  print("Evolution complete\n")
 
   # inject children's W and b to the NN objects
   for ind in NNs_copy:
