@@ -7,7 +7,7 @@ percent = [0.1, 0.2, 0.3, 0.5]
 mutation = [0.01, 0.05, 0.1, 0.5]
 increment = [0.001, 0.01, 0.05, 0.1]
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
     for gen in generations:
         for ind in population:
             for layer in layers:
