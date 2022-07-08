@@ -5,6 +5,7 @@ from sklearn.datasets import fetch_openml
 # genetic algorithm
 import numpy as np
 import random
+import params
 
 from matplotlib import pyplot as plt #package for visualization
 import warnings
@@ -36,7 +37,6 @@ population = 10
 hid_nodes = 10
 selection_percent = 0.2 
 mut_rate = 0.05
-mut_increment = 0.01
 
 ####### 1. Initialization #######
 # setup lists for: NNs and scores
@@ -46,12 +46,19 @@ Having an original and a copy is essential so not to overwrite while evolution
 NNs = {}
 NNs_copy = {}
 
+# store training and validation scores
+training_score = []
+validation_score = []
+
 # initialize NN and score 0 for each individual
 for ind in range(population):
   NNs[ind] = {"model":MLPClassifier(hidden_layer_sizes=(hid_nodes,), max_iter=1, alpha=1e-4,
                           solver='sgd', verbose=10, learning_rate_init=.1),
                           "score":0}
   NNs[ind]["model"].fit(X_train, y_train) # fit the network to initialize W and b
+# randomly initialize weights and biases
+  NNs[ind]["model"].coefs_[0] = np.random.rand(784,hid_nodes) 
+  NNs[ind]["model"].coefs_[1] = np.random.rand(hid_nodes,10)
 
 # start training
 for gen in range(generations):
@@ -59,11 +66,19 @@ for gen in range(generations):
 
   # ####### 2. Calculate fitness #######
   print("Calculate fitness🧮")
-  score = [] # for display purpose, store scores
+  train_score = [] # for display purpose, store scores
   for ind in NNs:
     NNs[ind]["score"]= NNs[ind]["model"].score(X_train, y_train) # calculate the score
-    score.append(NNs[ind]["score"])
-  print("Mean score: ", np.mean(score))
+    train_score.append(NNs[ind]["score"])
+  print("Mean score: ", np.mean(train_score))
+  training_score.append(np.mean(train_score))
+
+  val_score = []
+  for ind in NNs:
+    NNs[ind]["score"]= NNs[ind]["model"].score(X_val, y_val) # calculate the score
+    val_score.append(NNs[ind]["score"])
+  print("Mean validation score: ", np.mean(val_score))
+  validation_score.append(np.mean(val_score))
   NNs_copy = NNs # clone the population
 
   ####### 3. Select top 20% #######
@@ -98,7 +113,7 @@ for gen in range(generations):
       # randomly chose loci for mutation
       mutate_idx = np.random.choice(len(child_coefs),size = int(mut_rate*len(prt1)))
       for idx in mutate_idx:
-        child_coefs[idx] += random.choice([-1,1])*mut_increment
+        child_coefs[idx] += np.random.normal(loc=0.1)
 
       child.append(child_coefs.reshape(prt1.shape)) # child of weights and biases
 
