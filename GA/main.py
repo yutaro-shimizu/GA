@@ -2,10 +2,13 @@
 from sklearn.neural_network import MLPClassifier
 from sklearn.datasets import fetch_openml
 
+
 # genetic algorithm
 import numpy as np
 import random
 import params
+import pandas as pd
+import sys
 
 from matplotlib import pyplot as plt #package for visualization
 import warnings
@@ -13,12 +16,29 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # load data
-X, y = fetch_openml('mnist_784', version=1, return_X_y=True)
-X = X / 255 #scale the data
+print("load data")
 
-# use the traditional train/test split
-X_train, X_val, X_test = X[:10000], X[10000:20000], X[20000:30000]
-y_train, y_val, y_test = y[:10000], y[10000:20000], y[20000:30000]
+data_train = pd.read_csv('mnist_train.csv') #load MNIST training data in
+data_train = np.array(data_train) #turn into array
+m, n =data_train.shape
+#data=data[0:4999][n]
+np.random.shuffle(data_train)
+Y_train=data_train[:,0]
+X_train=data_train[:,1:n]
+
+data_test = pd.read_csv('mnist_test.csv') #validating data loaded in
+data_test = np.array(data_test) #turned to array and transposed
+p, q = data_test.shape
+np.random.shuffle(data_test)
+
+y_test =data_test[:,0] #first row of data
+X_test = data_test[:,1:q] #rest of data
+
+#next two lines are taking 10,000 samples from MNIST
+X_train, X_val = X_train[:10000], X_train[10000:20000]
+y_train, y_val = Y_train[:10000], Y_train[10000:20000]
+
+print("load data complete")
 
 # # stochastic gradient descent
 
@@ -32,11 +52,19 @@ y_train, y_val, y_test = y[:10000], y[10000:20000], y[20000:30000]
 
 # plt.show()
 
-generations = 10
-population = 10
-hid_nodes = 10
-selection_percent = 0.2 
-mut_rate = 0.05
+# input hyperparameters from the shell script
+generations = 50 #int(sys.argv[1]) #10
+population = 30 #int(sys.argv[2]) #10
+hid_nodes = 10 #int(sys.argv[3]) #10
+selection_percent = 0.2 #int(sys.argv[4]) #20
+mut_rate = 0.05 #float(sys.argv[5]) #0.05
+# print("Total arguments: ", len(sys.argv))
+# print("generations: ", sys.argv[1])
+# print("population: ", sys.argv[2])
+# print("hid_nodes: ", sys.argv[3])
+# print("select_percent: ", sys.argv[4])
+# print("mut_rate: ", sys.argv[5])
+
 
 ####### 1. Initialization #######
 # setup lists for: NNs and scores
@@ -65,7 +93,7 @@ for gen in range(generations):
   print("Current generation: ", gen)
 
   # ####### 2. Calculate fitness #######
-  print("Calculate fitness🧮")
+  print("Calculate fitness")
   train_score = [] # for display purpose, store scores
   for ind in NNs:
     NNs[ind]["score"]= NNs[ind]["model"].score(X_train, y_train) # calculate the score
@@ -82,8 +110,8 @@ for gen in range(generations):
   NNs_copy = NNs # clone the population
 
   ####### 3. Select top 20% #######
-  print("Evolution begins🦠👩‍🏭")
-  lst = dict(sorted(NNs.items(), key = lambda NNs:(NNs[1]["score"], NNs[0]), reverse=True)) # sort the list for selection
+  print("Evolution begins")
+  NNs = dict(sorted(NNs.items(), key = lambda NNs:(NNs[1]["score"], NNs[0]), reverse=True)) # sort the list for selection
 
   ####### 4. Evolve top 20% #######
   num_selected = int(population * selection_percent)
@@ -118,7 +146,7 @@ for gen in range(generations):
       child.append(child_coefs.reshape(prt1.shape)) # child of weights and biases
 
     children[i] = child # put child in the population of children
-  print("Evolution complete🦠✨")
+  print("Evolution complete✨")
 
   # inject children's W and b to the NN objects
   for ind in NNs_copy:
@@ -132,6 +160,7 @@ lst = dict(sorted(NNs.items(), key = lambda NNs:(NNs[1]["score"], NNs[0]), rever
 final_score = NNs[0]["model"].score(X_test, y_test) #fit the best model
 print(final_score)
 
-# training vs validation%%!
-# parameters
-# time
+plt.plot(training_score, label = "training")
+plt.plot(validation_score, label = "validation")
+plt.legend()
+plt.show()
