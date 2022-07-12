@@ -17,14 +17,14 @@ warnings.filterwarnings('ignore')
 
 
 # input hyperparameters from the shell script
-generations = int(sys.argv[1]) #10
-population = int(sys.argv[2]) #10
+generations = 10 #int(sys.argv[1]) #10
+population = 50 #int(sys.argv[2]) #10
 hid_nodes = 10 #int(sys.argv[3]) #10
 selection_percent = 0.2 #int(sys.argv[4]) #20
 mut_rate = 0.05 #float(sys.argv[5]) #0.05
-print("Total arguments: ", len(sys.argv))
-print("generations: ", sys.argv[1])
-print("population: ", sys.argv[2])
+# print("Total arguments: ", len(sys.argv))
+# print("generations: ", sys.argv[1])
+# print("population: ", sys.argv[2])
 # print("hid_nodes: ", sys.argv[3])
 # print("select_percent: ", sys.argv[4])
 # print("mut_rate: ", sys.argv[5])
@@ -35,7 +35,6 @@ print("load data")
 data_train = pd.read_csv('mnist_train.csv') #load MNIST training data in
 data_train = np.array(data_train) #turn into array
 m, n =data_train.shape
-#data=data[0:4999][n]
 np.random.shuffle(data_train)
 Y_train=data_train[:,0]
 X_train=data_train[:,1:n]
@@ -86,8 +85,8 @@ for ind in range(population):
                           "score":0}
   NNs[ind]["model"].fit(X_train, y_train) # fit the network to initialize W and b
 # randomly initialize weights and biases
-  NNs[ind]["model"].coefs_[0] = np.random.rand(784,hid_nodes) 
-  NNs[ind]["model"].coefs_[1] = np.random.rand(hid_nodes,10)
+  NNs[ind]["model"].coefs_[0] = np.random.uniform(low=-1,high=1,size=(784,hid_nodes)) 
+  NNs[ind]["model"].coefs_[1] = np.random.uniform(low=-1,high=1,size=(hid_nodes,10)) 
 
 # start training
 for gen in range(generations):
@@ -99,15 +98,15 @@ for gen in range(generations):
   for ind in NNs:
     NNs[ind]["score"]= NNs[ind]["model"].score(X_train, y_train) # calculate the score
     train_score.append(NNs[ind]["score"])
-  print("Mean score: ", np.mean(train_score))
-  training_score.append(np.mean(train_score))
+  print("Mean score: ", np.amax(train_score))
+  training_score.append(np.amax(train_score))
 
   val_score = []
   for ind in NNs:
     NNs[ind]["score"]= NNs[ind]["model"].score(X_val, y_val) # calculate the score
     val_score.append(NNs[ind]["score"])
-  print("Mean validation score: ", np.mean(val_score))
-  validation_score.append(np.mean(val_score))
+  print("Mean validation score: ", np.amax(val_score))
+  validation_score.append(np.amax(val_score))
   NNs_copy = NNs # clone the population
 
   ####### 3. Select top 20% #######
@@ -134,13 +133,13 @@ for gen in range(generations):
       
       # cross over takes place HERE
 
-      locus = random.randint(1,len(prt1)-1)
+      locus = random.randint(1,prt1.size-1)
 
       child_coefs = np.concatenate((prt1.flat[0:locus], prt2.flat[locus: ])) # vectorize prt2
 
       # mutation
       # randomly chose loci for mutation
-      mutate_idx = np.random.choice(len(child_coefs),size = int(mut_rate*len(prt1)))
+      mutate_idx = np.random.choice(child_coefs.size,size = int(mut_rate*prt1.size))
       for idx in mutate_idx:
         child_coefs[idx] += np.random.normal(loc=0.1)
 
