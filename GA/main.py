@@ -135,7 +135,7 @@ for gen in range(generations):
     p1 = NNs[prt1_idx]['score']
     p2 = NNs[prt2_idx]['score']
 
-    locus = random.randint(1,prt1.size-1)
+    locus = random.randint(1,len(NNs[prt1_idx]["model"].coefs_[0])-1)
 
     # cross over
     for j in range(2): # cross over for each layer
