@@ -17,14 +17,14 @@ warnings.filterwarnings('ignore')
 
 
 # input hyperparameters from the shell script
-generations = 10 #int(sys.argv[1]) #10
-population = 50 #int(sys.argv[2]) #10
+generations = int(sys.argv[1]) #10
+population = int(sys.argv[2]) #10
 hid_nodes = 10 #int(sys.argv[3]) #10
 selection_percent = 0.2 #int(sys.argv[4]) #20
 mut_rate = 0.05 #float(sys.argv[5]) #0.05
-# print("Total arguments: ", len(sys.argv))
-# print("generations: ", sys.argv[1])
-# print("population: ", sys.argv[2])
+print("Total arguments: ", len(sys.argv))
+print("generations: ", sys.argv[1])
+print("population: ", sys.argv[2])
 # print("hid_nodes: ", sys.argv[3])
 # print("select_percent: ", sys.argv[4])
 # print("mut_rate: ", sys.argv[5])
