@@ -25,8 +25,8 @@ warnings.filterwarnings('ignore')
 
 
 # input hyperparameters from the shell script
-generations = 10 #int(sys.argv[1]) #10
-population = 10 #int(sys.argv[2]) #10
+generations = 100 #int(sys.argv[1]) #10
+population = 100 #int(sys.argv[2]) #10
 hid_nodes = 10 #int(sys.argv[3]) #10
 selection_percent = 0.2 #int(sys.argv[4]) #20
 mut_rate = 0.05 #float(sys.argv[5]) #0.05
@@ -117,6 +117,7 @@ for gen in range(generations):
 
   ####### 3. Select top 20% #######
   NNs = dict(sorted(NNs.items(), key = lambda NNs:(NNs[1]["score"], NNs[0]), reverse=True)) # sort the list for selection
+  NNs = {i: v for i, v in enumerate(NNs.values())}  
   NNs_copy = NNs # clone the population
 
   ####### 4. Evolve top 20% #######
@@ -127,20 +128,26 @@ for gen in range(generations):
 
     child = [] # each child w custom number of hidden layers
     
+    # random selection of parents from top 20%
+    prt1_idx = random.randint(0,num_selected - 1) 
+    prt2_idx = random.randint(0,num_selected - 1)
+
+    p1 = NNs[prt1_idx]['score']
+    p2 = NNs[prt2_idx]['score']
+
+    locus = random.randint(1,prt1.size-1)
+
     # cross over
     for j in range(2): # cross over for each layer
 
-      # random selection of parents from top 20%
-      prt1_idx = random.randint(0,num_selected - 1) 
-      prt2_idx = random.randint(0,num_selected - 1)
+      # # random selection of parents from top 20%
+      # prt1_idx = random.randint(0,num_selected - 1) 
+      # prt2_idx = random.randint(0,num_selected - 1)
 
       prt1 = NNs[prt1_idx]["model"].coefs_[j] #parent 1 w/ extracted weights and biases
       prt2 = NNs[prt2_idx]["model"].coefs_[j] #parent 2 w/ extracted weights and biases
       
       # cross over takes place HERE
-
-      locus = random.randint(1,prt1.size-1)
-
       child_coefs = np.concatenate((prt1.flat[0:locus], prt2.flat[locus: ])) # vectorize prt2
 
       # mutation
