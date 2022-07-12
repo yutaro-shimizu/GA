@@ -1,3 +1,11 @@
+import cProfile
+import pstats
+import pickle
+
+# check resource use by Python Profiling
+profiler = cProfile.Profile()
+profiler.enable()
+
 #import neural network pacakages
 from sklearn.neural_network import MLPClassifier
 from sklearn.datasets import fetch_openml
@@ -17,14 +25,14 @@ warnings.filterwarnings('ignore')
 
 
 # input hyperparameters from the shell script
-generations = int(sys.argv[1]) #10
-population = int(sys.argv[2]) #10
+generations = 10 #int(sys.argv[1]) #10
+population = 10 #int(sys.argv[2]) #10
 hid_nodes = 10 #int(sys.argv[3]) #10
 selection_percent = 0.2 #int(sys.argv[4]) #20
 mut_rate = 0.05 #float(sys.argv[5]) #0.05
-print("Total arguments: ", len(sys.argv))
-print("generations: ", sys.argv[1])
-print("population: ", sys.argv[2])
+# print("Total arguments: ", len(sys.argv))
+# print("generations: ", sys.argv[1])
+# print("population: ", sys.argv[2])
 # print("hid_nodes: ", sys.argv[3])
 # print("select_percent: ", sys.argv[4])
 # print("mut_rate: ", sys.argv[5])
@@ -93,25 +101,23 @@ for gen in range(generations):
   print("Current generation: ", gen)
 
   # ####### 2. Calculate fitness #######
-  print("Calculate fitness")
   train_score = [] # for display purpose, store scores
   for ind in NNs:
     NNs[ind]["score"]= NNs[ind]["model"].score(X_train, y_train) # calculate the score
     train_score.append(NNs[ind]["score"])
-  print("Mean score: ", np.amax(train_score))
+  print("Max training score: ", np.amax(train_score))
   training_score.append(np.amax(train_score))
 
   val_score = []
   for ind in NNs:
     NNs[ind]["score"]= NNs[ind]["model"].score(X_val, y_val) # calculate the score
     val_score.append(NNs[ind]["score"])
-  print("Mean validation score: ", np.amax(val_score))
+  print("Max validation score: ", np.amax(val_score))
   validation_score.append(np.amax(val_score))
-  NNs_copy = NNs # clone the population
 
   ####### 3. Select top 20% #######
-  print("Evolution begins")
   NNs = dict(sorted(NNs.items(), key = lambda NNs:(NNs[1]["score"], NNs[0]), reverse=True)) # sort the list for selection
+  NNs_copy = NNs # clone the population
 
   ####### 4. Evolve top 20% #######
   num_selected = int(population * selection_percent)
@@ -146,7 +152,7 @@ for gen in range(generations):
       child.append(child_coefs.reshape(prt1.shape)) # child of weights and biases
 
     children[i] = child # put child in the population of children
-  print("Evolution complete✨")
+  print("Evolution complete\n")
 
   # inject children's W and b to the NN objects
   for ind in NNs_copy:
@@ -156,11 +162,16 @@ for gen in range(generations):
   NNs, NNs_copy = NNs_copy, NNs # overwrite the origial copy
 
 ####### 5. Calculate final score #######
-lst = dict(sorted(NNs.items(), key = lambda NNs:(NNs[1]["score"], NNs[0]), reverse=True)) # sort the list
+NNs = dict(sorted(NNs.items(), key = lambda NNs:(NNs[1]["score"], NNs[0]), reverse=True)) # sort the list
 final_score = NNs[0]["model"].score(X_test, y_test) #fit the best model
 print(final_score)
 
 plt.plot(training_score, label = "training")
 plt.plot(validation_score, label = "validation")
 plt.legend()
-plt.show()
+plt.show(block=True)
+
+profiler.disable()
+stats = pstats.Stats(profiler).sort_stats("tottime")
+# stats.print_stats() #print the stats report for profiling
+
