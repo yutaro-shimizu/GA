@@ -1,11 +1,3 @@
-import cProfile
-import pstats
-import pickle
-
-# check resource use by Python Profiling
-profiler = cProfile.Profile()
-profiler.enable()
-
 #import neural network pacakages
 from sklearn.neural_network import MLPClassifier
 from sklearn.datasets import fetch_openml
@@ -18,21 +10,26 @@ import params
 import pandas as pd
 import sys
 
+import timeit
+# import cProfile
+# import pstats
+
 from matplotlib import pyplot as plt #package for visualization
 import warnings
 
 warnings.filterwarnings('ignore')
 
+tic_all = timeit.default_timer()
 
 # input hyperparameters from the shell script
-generations = 100 #int(sys.argv[1]) #10
-population = 100 #int(sys.argv[2]) #10
+generations = int(sys.argv[1]) #10
+population = int(sys.argv[2]) #10
 hid_nodes = 10 #int(sys.argv[3]) #10
 selection_percent = 0.2 #int(sys.argv[4]) #20
 mut_rate = 0.05 #float(sys.argv[5]) #0.05
-# print("Total arguments: ", len(sys.argv))
-# print("generations: ", sys.argv[1])
-# print("population: ", sys.argv[2])
+print("Total arguments: ", len(sys.argv))
+print("generations: ", sys.argv[1])
+print("population: ", sys.argv[2])
 # print("hid_nodes: ", sys.argv[3])
 # print("select_percent: ", sys.argv[4])
 # print("mut_rate: ", sys.argv[5])
@@ -90,7 +87,8 @@ validation_score = []
 for ind in range(population):
   NNs[ind] = {"model":MLPClassifier(hidden_layer_sizes=(hid_nodes,), max_iter=1, alpha=1e-4,
                           solver='sgd', verbose=10, learning_rate_init=.1),
-                          "score":0}
+                          "train_score":0,
+                          "val_score":0}
   NNs[ind]["model"].fit(X_train, y_train) # fit the network to initialize W and b
 # randomly initialize weights and biases
   NNs[ind]["model"].coefs_[0] = np.random.uniform(low=-1,high=1,size=(784,hid_nodes)) 
@@ -101,26 +99,38 @@ for gen in range(generations):
   print("Current generation: ", gen)
 
   # ####### 2. Calculate fitness #######
-  train_score = [] # for display purpose, store scores
-  for ind in NNs:
-    NNs[ind]["score"]= NNs[ind]["model"].score(X_train, y_train) # calculate the score
-    train_score.append(NNs[ind]["score"])
-  print("Max training score: ", np.amax(train_score))
-  training_score.append(np.amax(train_score))
+  tic_fitness = timeit.default_timer()
+  # profiler = cProfile.Profile()
+  # profiler.enable()
 
+  train_score = [] # for display purpose, store scores
   val_score = []
+
   for ind in NNs:
-    NNs[ind]["score"]= NNs[ind]["model"].score(X_val, y_val) # calculate the score
-    val_score.append(NNs[ind]["score"])
+    NNs[ind]["train_score"]= NNs[ind]["model"].score(X_train, y_train) # calculate the score
+    NNs[ind]["val_score"]= NNs[ind]["model"].score(X_val, y_val)
+    train_score.append(NNs[ind]["train_score"])
+    val_score.append(NNs[ind]["val_score"])
+  print("Max training score: ", np.amax(train_score))
   print("Max validation score: ", np.amax(val_score))
+  training_score.append(np.amax(train_score))
   validation_score.append(np.amax(val_score))
+  # profiler.disable()
+  # stats = pstats.Stats(profiler).sort_stats("tottime")
+
+  toc_fitness = timeit.default_timer()
+  print('fitness time: ',toc_fitness-tic_fitness)
 
   ####### 3. Select top 20% #######
-  NNs = dict(sorted(NNs.items(), key = lambda NNs:(NNs[1]["score"], NNs[0]), reverse=True)) # sort the list for selection
+  tic_select = timeit.default_timer()
+  NNs = dict(sorted(NNs.items(), key = lambda NNs:(NNs[1]["train_score"], NNs[0]), reverse=True)) # sort the list for selection
   NNs = {i: v for i, v in enumerate(NNs.values())}  
   NNs_copy = NNs # clone the population
+  toc_select = timeit.default_timer()
+  print('sorting time: ',toc_select-tic_select)
 
   ####### 4. Evolve top 20% #######
+  tic_evo = timeit.default_timer()
   num_selected = int(population * selection_percent)
 
   children = [[] for i in range(population)] # sublist for each child
@@ -129,25 +139,25 @@ for gen in range(generations):
     child = [] # each child w custom number of hidden layers
     
     # random selection of parents from top 20%
-    prt1_idx = random.randint(0,num_selected - 1) 
-    prt2_idx = random.randint(0,num_selected - 1)
+    # prt1_idx = random.randint(0,num_selected - 1) 
+    # prt2_idx = random.randint(0,num_selected - 1)
 
-    p1 = NNs[prt1_idx]['score']
-    p2 = NNs[prt2_idx]['score']
+    # p1 = NNs[prt1_idx]['score']
+    # p2 = NNs[prt2_idx]['score']
 
-    locus = random.randint(1,len(NNs[prt1_idx]["model"].coefs_[0])-1)
 
     # cross over
     for j in range(2): # cross over for each layer
 
       # # random selection of parents from top 20%
-      # prt1_idx = random.randint(0,num_selected - 1) 
-      # prt2_idx = random.randint(0,num_selected - 1)
+      prt1_idx = random.randint(0,num_selected - 1) 
+      prt2_idx = random.randint(0,num_selected - 1)
 
       prt1 = NNs[prt1_idx]["model"].coefs_[j] #parent 1 w/ extracted weights and biases
       prt2 = NNs[prt2_idx]["model"].coefs_[j] #parent 2 w/ extracted weights and biases
       
       # cross over takes place HERE
+      locus = random.randint(1,len(NNs[prt1_idx]["model"].coefs_[j])-1)
       child_coefs = np.concatenate((prt1.flat[0:locus], prt2.flat[locus: ])) # vectorize prt2
 
       # mutation
@@ -159,6 +169,8 @@ for gen in range(generations):
       child.append(child_coefs.reshape(prt1.shape)) # child of weights and biases
 
     children[i] = child # put child in the population of children
+  toc_evo = timeit.default_timer()
+  print("evolution time:", toc_evo - tic_evo)
   print("Evolution complete\n")
 
   # inject children's W and b to the NN objects
@@ -169,16 +181,17 @@ for gen in range(generations):
   NNs, NNs_copy = NNs_copy, NNs # overwrite the origial copy
 
 ####### 5. Calculate final score #######
-NNs = dict(sorted(NNs.items(), key = lambda NNs:(NNs[1]["score"], NNs[0]), reverse=True)) # sort the list
+NNs = dict(sorted(NNs.items(), key = lambda NNs:(NNs[1]["train_score"], NNs[0]), reverse=True)) # sort the list for selection
+NNs = {i: v for i, v in enumerate(NNs.values())}
 final_score = NNs[0]["model"].score(X_test, y_test) #fit the best model
 print(final_score)
 
-plt.plot(training_score, label = "training")
-plt.plot(validation_score, label = "validation")
-plt.legend()
-plt.show(block=True)
-
-profiler.disable()
-stats = pstats.Stats(profiler).sort_stats("tottime")
+toc_all = timeit.default_timer()
+print("total time: ", toc_all - tic_all)
 # stats.print_stats() #print the stats report for profiling
 
+plt.plot(training_score, label = "training")
+plt.plot(validation_score, label = "validation")
+plt.title((generations, population, final_score))
+plt.legend()
+plt.show(block=True)
