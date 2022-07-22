@@ -4,6 +4,7 @@ from sklearn.neural_network import MLPClassifier
 import numpy as np
 import random 
 import pandas as pd
+import matplotlib.pyplot as plt
 
 import sys
 import warnings
@@ -122,6 +123,12 @@ def run():
         initializer.calculator(X_train, y_train, X_val, y_val)
         initializer.replace_neighbors(dimension,neighbor_size,mut_rate)
         print(initializer.NNs)
+
+    ######### 5.Plot Result #########
+    plt.plot(initializer.all_train_score, label = "training")
+    plt.plot(initializer.all_val_score, label = "validation")
+    plt.legend()
+    plt.show(block=True)
 
     return None
 
