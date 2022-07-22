@@ -51,26 +51,25 @@ def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
 
 class Initializer:
     def __init__(self, hid_nodes):
-        self.model = MLPClassifier(hidden_layer_sizes=(hid_nodes,), max_iter=1, alpha=1e-4,
-                          solver='sgd', verbose=10, learning_rate_init=.1)
-        self.train_score = 0
-        self.val_score = 0
+        self.NNs = {}
+        self.NNs_copy = {}
+        self.all_train_score = []
+        self.all_val_score = []
         self.neighbors = []
 
     def birth(self, population, hid_nodes, X_train, y_train):
-        self.NNs = {}
-        self.NNs_copy = {}
-        for ind in population:
-            for ind in range(population):
-                self.NNs[ind] = {"model":self.model,
-                            "train_score":self.train_score,
-                            "val_score":self.val_score}
-                self.NNs[ind]["model"].fit(X_train, y_train) # fit the network to initialize W and b
-                # randomly initialize weights and biases
-                self.NNs[ind]["model"].coefs_[0] = np.random.uniform(low=-1,high=1,size=(784,hid_nodes)) 
-                self.NNs[ind]["model"].coefs_[1] = np.random.uniform(low=-1,high=1,size=(hid_nodes,10))
+        for ind in range(population):
+            self.NNs[ind] = {"model":MLPClassifier(hidden_layer_sizes=(hid_nodes,), max_iter=1, alpha=1e-4,
+                          solver='sgd', verbose=10, learning_rate_init=.1),
+                        "train_score":0,
+                        "val_score":0}
+            self.NNs[ind]["model"].fit(X_train, y_train) # fit the network to initialize W and b
+            # randomly initialize weights and biases
+            self.NNs[ind]["model"].coefs_[0] = np.random.uniform(low=-1,high=1,size=(784,hid_nodes)) 
+            self.NNs[ind]["model"].coefs_[1] = np.random.uniform(low=-1,high=1,size=(hid_nodes,10))
+        self.NNs_copy = self.NNs
 
-    def calculator(self):
+    def calculator(self, X_train, y_train, X_val, y_val):
         train_score = []
         val_score = []
         for ind in self.NNs:
@@ -80,33 +79,52 @@ class Initializer:
             val_score.append(self.NNs[ind]["val_score"])
         print("Max training score: ", np.amax(train_score))
         print("Max validation score: ", np.amax(val_score))
-        self.train_score.append(np.amax(train_score))
-        self.val_score.append(np.amax(val_score))
+        self.all_train_score.append(np.amax(train_score))
+        self.all_val_score.append(np.amax(val_score))
 
-    def identify_neighbors(self, dimension,i,j):
+    def identify_max_neighbor(self,i,j,dim,neigh_size): #fix the modulus equation
         #take the score and compare
-        score = self.NNs[i+4*j]["model"].score(X_train, y_train) 
-        idx = (i+4*j)
-        for k in range(-1,2):
-            if score < self.NNs[(i+k)+4*(j+k)]["model"].score(X_train, y_train):
-                score = self.NNs[(i+k)+4*(j+k)]["model"].score(X_train, y_train)
-                idx = ((i+k)+4*(j+k))
+        score = self.NNs_copy[i*dim+j]["train_score"]
+        idx = i*dim+j
+        llim = -int(neigh_size/2)
+        rlim = int(neigh_size/2)
+        for k in range(llim,rlim+1):
+            for l in range(llim,rlim+1):
+                if score < self.NNs_copy[((i+k)%dim)*dim+(j+l)%dim]["train_score"]:
+                    score = self.NNs_copy[((i+k)%dim)*dim+(j+l)%dim]["train_score"]
+                    idx = ((i+k)%dim)*dim+(j+l)%dim
+                    print("swapped")
         return idx
 
-    def replace_neighbors(self,dimension):
-        for i in range(dimension):
-            for j in range(dimension):
-                self.NNs[i+4*j] = self.NNs[self.identify_neighbors(dimension, i, j)]
-
-    def mutation(self, idx, mut_rate):
+    def mutate(self, idx, mut_rate):
         for i in range(2):
             self.NNs[idx]["model"].coefs_[i]
-        # chose mutation sites
-        # mutate
-        mutate_idx = np.random.choice(child_coefs.size,size = int(mut_rate*prt1.size))
-        for idx in mutate_idx:
-            child_coefs[idx] += np.random.normal(loc=0.1)
-            return None
+            coef_size = self.NNs[idx]["model"].coefs_[i].size
+            shape = self.NNs[idx]["model"].coefs_[i].shape
+            mutate_idx = np.random.choice(coef_size,size = int(mut_rate*coef_size))
+            for loci in mutate_idx:
+                self.NNs[idx]["model"].coefs_[i].flat[loci] += np.random.normal(loc=0.1)
+                self.NNs[idx]["model"].coefs_[i].reshape(shape)
+        return None
+    
+    def replace_neighbors(self,dim,neigh_size,mut_rate=0.05):
+        for i in range(dim):
+            for j in range(dim):
+                idx = i*dim+(j+1)
+                self.NNs[idx] = self.NNs_copy[self.identify_max_neighbor(i,j,dim,neigh_size)]
+                self.mutate(idx, mut_rate)
+        self.NNs_copy = self.NNs
 
 def run():
+    X_train, X_val, X_test, y_train, y_val, y_test = load_data()
+    initializer = Initializer(10)
+    initializer.birth(9,10,X_train,y_train)
+    print(initializer.NNs)
+    for i in range(10):
+        initializer.calculator(X_train, y_train, X_val, y_val)
+        initializer.replace_neighbors(3,3,0.05)
+    print(initializer.NNs)
     return None
+
+if __name__ == "__main__":
+    run()
