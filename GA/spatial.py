@@ -5,23 +5,9 @@ import numpy as np
 import random 
 import pandas as pd
 
+import sys
 import warnings
 warnings.filterwarnings('ignore')
-
-def params():
-    # input hyperparameters from the shell script
-    generations = 10 #int(sys.argv[1]) #10
-    dimension = 10 #int(sys.argv[2]) #10
-    population = dimension ** 2
-    hid_nodes = 10 #int(sys.argv[3]) #10
-    selection_percent = 0.2 #int(sys.argv[4]) #20
-    mut_rate = 0.5 #float(sys.argv[5]) #0.05
-    print("Total arguments: ", len(sys.argv))
-    print("generations: ", sys.argv[1])
-    print("population: ", sys.argv[2])
-    # print("hid_nodes: ", sys.argv[3])
-    # print("select_percent: ", sys.argv[4])
-    # print("mut_rate: ", sys.argv[5])
 
 def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
     # load data
@@ -51,8 +37,8 @@ def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
 
 class Initializer:
     def __init__(self, hid_nodes):
-        self.NNs = {}
-        self.NNs_copy = {}
+        self.NNs = {} #  set of models for evolution. Swaps based on training score during evolution. 
+        self.NNs_copy = {} # for reference during evolution. Does not change during swaps.
         self.all_train_score = []
         self.all_val_score = []
         self.neighbors = []
@@ -67,7 +53,6 @@ class Initializer:
             # randomly initialize weights and biases
             self.NNs[ind]["model"].coefs_[0] = np.random.uniform(low=-1,high=1,size=(784,hid_nodes)) 
             self.NNs[ind]["model"].coefs_[1] = np.random.uniform(low=-1,high=1,size=(hid_nodes,10))
-        self.NNs_copy = self.NNs
 
     def calculator(self, X_train, y_train, X_val, y_val):
         train_score = []
@@ -77,6 +62,7 @@ class Initializer:
             self.NNs[ind]["val_score"]= self.NNs[ind]["model"].score(X_val, y_val)
             train_score.append(self.NNs[ind]["train_score"])
             val_score.append(self.NNs[ind]["val_score"])
+        self.NNs_copy = self.NNs # copy original including the scores
         print("Max training score: ", np.amax(train_score))
         print("Max validation score: ", np.amax(val_score))
         self.all_train_score.append(np.amax(train_score))
@@ -98,32 +84,45 @@ class Initializer:
 
     def mutate(self, idx, mut_rate):
         for i in range(2):
-            self.NNs[idx]["model"].coefs_[i]
             coef_size = self.NNs[idx]["model"].coefs_[i].size
             shape = self.NNs[idx]["model"].coefs_[i].shape
             mutate_idx = np.random.choice(coef_size,size = int(mut_rate*coef_size))
             for loci in mutate_idx:
-                self.NNs[idx]["model"].coefs_[i].flat[loci] += np.random.normal(loc=0.1)
-                self.NNs[idx]["model"].coefs_[i].reshape(shape)
+                self.NNs[idx]["model"].coefs_[i].flat[loci] += np.random.normal(loc=0.05)
+            self.NNs[idx]["model"].coefs_[i].reshape(shape)
         return None
     
     def replace_neighbors(self,dim,neigh_size,mut_rate=0.05):
         for i in range(dim):
             for j in range(dim):
-                idx = i*dim+(j+1)
+                idx = i*dim+j
                 self.NNs[idx] = self.NNs_copy[self.identify_max_neighbor(i,j,dim,neigh_size)]
                 self.mutate(idx, mut_rate)
         self.NNs_copy = self.NNs
 
 def run():
+
+    ######### 1.Set Hyperparameters #########
+    generations = 10 #int(sys.argv[1]) #10
+    dimension = 4 #int(sys.argv[2]) #10
+    population = dimension ** 2
+    hid_nodes = 10 #int(sys.argv[3]) #10
+    mut_rate = 0.05 #float(sys.argv[4]) #0.05
+    neighbor_size = 3
+    
+    ######### 2.Load Data #########
     X_train, X_val, X_test, y_train, y_val, y_test = load_data()
-    initializer = Initializer(10)
-    initializer.birth(9,10,X_train,y_train)
-    print(initializer.NNs)
-    for i in range(10):
+
+    ######### 3.Initialize Populatioin #########
+    initializer = Initializer(hid_nodes)
+    initializer.birth(population,hid_nodes,X_train,y_train)
+
+    ######### 4.Run Spatial Evolution #########
+    for i in range(generations):
         initializer.calculator(X_train, y_train, X_val, y_val)
-        initializer.replace_neighbors(3,3,0.05)
-    print(initializer.NNs)
+        initializer.replace_neighbors(dimension,neighbor_size,mut_rate)
+        print(initializer.NNs)
+
     return None
 
 if __name__ == "__main__":
