@@ -1,4 +1,6 @@
 #import neural network pacakages
+from re import A
+from scipy.misc import face
 from sklearn.neural_network import MLPClassifier
 from copy import deepcopy
 
@@ -76,6 +78,39 @@ class Spatial_GA:
         self.all_train_score.append(np.amax(train_score))
         self.all_val_score.append(np.amax(val_score))
 
+        return val_score
+    
+    def plot_growth(self, val_score, dim, i):
+
+        COLOUR = 'white'
+        plt.rcParams['text.color'] = COLOUR
+        plt.rcParams['axes.labelcolor'] = COLOUR
+        plt.rcParams['xtick.color'] = COLOUR
+        plt.rcParams['ytick.color'] = COLOUR
+
+        plt.figure(facecolor="black")
+        im = plt.imshow(np.reshape((val_score),(dim,dim)),vmin=0.1,vmax=0.8)
+        plt.colorbar(im)
+        plt.savefig(f'./Figures/figure{i}.png', transparent=True)
+
+    def plot_final(self):
+
+        COLOUR = 'white'
+        plt.rcParams['text.color'] = COLOUR
+        plt.rcParams['axes.labelcolor'] = COLOUR
+        plt.rcParams['axes.edgecolor'] = COLOUR
+        plt.rcParams['axes.facecolor'] = 'black'
+        plt.rcParams['xtick.color'] = COLOUR
+        plt.rcParams['ytick.color'] = COLOUR
+
+        plt.figure(facecolor="black")
+        plt.plot(self.all_train_score, label = "training")
+        plt.plot(self.all_val_score, label = "validation")
+        plt.xlabel("generations")
+        plt.ylabel("max accuracy of individual")
+        plt.legend()
+        plt.savefig('./Figures/final.png', transparent=True)
+
     def identify_max_neighbor(self, i, j, dim, neigh_size): 
         score = self.NNs_copy[i * dim + j]["train_score"]
         idx = i * dim + j
@@ -139,16 +174,13 @@ def run():
     ######### 4.Run Spatial Evolution #########
     for i in range(generations):
         print("\ncurrent generation: ", i)
-        spaceGA.calculator(X_train, y_train, X_val, y_val)
-        spaceGA.probe_neighbors(dimension,neighbor_size,mut_rate)
+        val_score = spaceGA.calculator(X_train, y_train, X_val, y_val)
+        if i%10 == 0:
+            spaceGA.plot_growth(val_score, dimension, i)
+        spaceGA.probe_neighbors(dimension, neighbor_size, mut_rate)
 
     ######### 5.Plot Result #########
-    plt.plot(spaceGA.all_train_score, label = "training")
-    plt.plot(spaceGA.all_val_score, label = "validation")
-    plt.xlabel("generations")
-    plt.ylabel("max accuracy of individual")
-    plt.legend()
-    plt.show(block=True)
+    spaceGA.plot_final()
 
     return None
 
