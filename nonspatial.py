@@ -1,7 +1,5 @@
 #import neural network pacakages
 from sklearn.neural_network import MLPClassifier
-from sklearn.datasets import fetch_openml
-
 
 # genetic algorithm
 import numpy as np
@@ -26,7 +24,7 @@ generations = int(sys.argv[1]) #10
 population = int(sys.argv[2]) #10
 hid_nodes = 10 #int(sys.argv[3]) #10
 selection_percent = 0.2 #int(sys.argv[4]) #20
-mut_rate = 0.05 #float(sys.argv[5]) #0.05
+mut_rate = 0.5 #float(sys.argv[5]) #0.05
 print("Total arguments: ", len(sys.argv))
 print("generations: ", sys.argv[1])
 print("population: ", sys.argv[2])
