@@ -1,5 +1,7 @@
 # Genetic Algorithm: Computation, Ecology and Information
-<img width="601" alt="Screenshot 2022-07-25 001715" src="https://user-images.githubusercontent.com/68834841/180710714-bd092eb8-3019-4362-8c7c-bc902401620b.png">
+
+<img width="598" alt="Screenshot 2022-07-25 001715" src="https://user-images.githubusercontent.com/68834841/180711021-4163c814-0a22-4df5-9872-adc7d14936f7.png">
+
 ![spatial_growth](https://user-images.githubusercontent.com/68834841/180710811-8de332bf-2dd3-4d78-a31b-19d21837cb8b.gif)
 
 Tracking code changes for SFI UCR on Genetic ALgorithm project.
