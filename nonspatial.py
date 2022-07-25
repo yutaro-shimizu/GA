@@ -4,7 +4,6 @@ from sklearn.neural_network import MLPClassifier
 # genetic algorithm
 import numpy as np
 import random
-import params
 import pandas as pd
 import sys
 
@@ -188,8 +187,19 @@ toc_all = timeit.default_timer()
 print("total time: ", toc_all - tic_all)
 # stats.print_stats() #print the stats report for profiling
 
+COLOUR = 'white'
+plt.rcParams['text.color'] = COLOUR
+plt.rcParams['axes.labelcolor'] = COLOUR
+plt.rcParams['axes.edgecolor'] = COLOUR
+plt.rcParams['axes.facecolor'] = 'black'
+plt.rcParams['xtick.color'] = COLOUR
+plt.rcParams['ytick.color'] = COLOUR
+
+plt.figure(facecolor="black")
 plt.plot(training_score, label = "training")
 plt.plot(validation_score, label = "validation")
-plt.title((generations, population, final_score))
 plt.legend()
-plt.show(block=True)
+plt.xlabel("generations")
+plt.ylabel("max accuracy of individual")
+plt.legend()
+plt.savefig('./Figures/final.png', transparent=True)
