@@ -1,4 +1,4 @@
-# GA
+# Genetic Algorithm: Computation, Ecology and Information
 
 Tracking code changes for SFI UCR on Genetic ALgorithm project.
 
