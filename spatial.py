@@ -175,6 +175,7 @@ def run():
     for i in range(generations):
         print("\ncurrent generation: ", i)
         val_score = spaceGA.calculator(X_train, y_train, X_val, y_val)
+        ######### Plot growth per 10 iterations #########
         if i%10 == 0:
             spaceGA.plot_growth(val_score, dimension, i)
         spaceGA.probe_neighbors(dimension, neighbor_size, mut_rate)
