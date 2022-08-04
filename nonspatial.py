@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import sys
 
 #import neural network pacakages
 from sklearn.neural_network import MLPClassifier
@@ -112,7 +113,7 @@ class NonSpatial_GA:
     """
     mutate_idx = np.random.choice(child_coefs.size, int(mut_rate*child_coefs.size))
     for idx in mutate_idx:
-      child_coefs[idx] += np.random.normal(loc=0.0005)
+      child_coefs[idx] += np.random.normal(loc=0.005)
     return child_coefs
 
   def inject_weights(self,children):
@@ -172,25 +173,23 @@ class NonSpatial_GA:
     plt.legend()
     plt.savefig('./Figures/final_nonspatial.png', transparent=True)
 
-    plt.figure(facecolor="black")
-    plt.plot(self.diversity)
-    plt.legend()
-    plt.xlabel("Generations")
-    plt.ylabel("Mean Diversity")
-    plt.legend()
-    plt.savefig('./Figures/nonspatial_diversity.png', transparent=True)
+    # plt.figure(facecolor="black")
+    # plt.plot(self.diversity)
+    # plt.xlabel("Generations")
+    # plt.ylabel("Mean Diversity")
+    # plt.savefig('./Figures/nonspatial_diversity.png', transparent=True)
 
 def run():
   ############## 1. import hyperparameters ##############
   # input hyperparameters from the shell script
-  generations = 100 #int(sys.argv[1]) #10
-  population = 100 #int(sys.argv[2]) #10
+  generations = int(sys.argv[1]) #10
+  population = int(sys.argv[2]) #10
   hid_nodes = 10 #int(sys.argv[3]) #10
   selection_percent = 0.2 #int(sys.argv[4]) #20
   cv_switch = False #bool(sys.argv[5])
-  # print("Total arguments: ", len(sys.argv))
-  # print("generations: ", sys.argv[1])
-  # print("population: ", sys.argv[2])
+  print("Total arguments: ", len(sys.argv))
+  print("generations: ", sys.argv[1])
+  print("population: ", sys.argv[2])
 
   ############## 2. load data ##############
   X_train, X_val, X_test, y_train, y_val, y_test = load_data()
