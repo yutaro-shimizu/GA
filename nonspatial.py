@@ -105,7 +105,7 @@ class NonSpatial_GA:
       child_coefs = np.ravel(prt1)
     return child_coefs, prt1.shape
   
-  def mutation(self, child_coefs,mut_rate=0.5):
+  def mutation(self, child_coefs,mut_rate=0.2):
     # mutation
     # randomly chose loci for mutation
     """
