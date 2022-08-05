@@ -78,7 +78,6 @@ class NonSpatial_GA:
           self.NNs[ind]["val_score"]= self.NNs[ind]["model"].score(X_val, y_val)
           train_score.append(self.NNs[ind]["train_score"])
           val_score.append(self.NNs[ind]["val_score"])
-      self.NNs_copy = deepcopy(self.NNs) # copy original including the scores
       print("Max training score: ", np.amax(train_score))
       print("Max validation score: ", np.amax(val_score))
       self.all_train_score.append(np.amax(train_score))
@@ -105,7 +104,7 @@ class NonSpatial_GA:
       child_coefs = np.ravel(prt1)
     return child_coefs, prt1.shape
   
-  def mutation(self, child_coefs,mut_rate=0.2):
+  def mutation(self, child_coefs,mut_rate=0.5):
     # mutation
     # randomly chose loci for mutation
     """
