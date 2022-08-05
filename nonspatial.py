@@ -91,12 +91,12 @@ class NonSpatial_GA:
   def crossover(self, num_selected, j, cv_switch, mut_rate=0.05):
     # # random selection of parents from top 20%
     prt1_idx = random.randint(0,num_selected - 1) 
-    prt2_idx = random.randint(0,num_selected - 1)
-
     prt1 = self.NNs[prt1_idx]["model"].coefs_[j] #parent 1 w/ extracted weights and biases
-    prt2 = self.NNs[prt2_idx]["model"].coefs_[j] #parent 2 w/ extracted weights and biases
 
-    if cv_switch:
+    if cv_switch: # if cross over happens identify the second parent 
+      prt2_idx = random.randint(0,num_selected - 1)
+      prt2 = self.NNs[prt2_idx]["model"].coefs_[j] #parent 2 w/ extracted weights and biases
+
       # cross over takes place HERE
       locus = random.randint(1,len(self.NNs[prt1_idx]["model"].coefs_[j])-1)
       child_coefs = np.concatenate((prt1.flat[0:locus], prt2.flat[locus: ])) # vectorize prt2
@@ -199,7 +199,7 @@ def run():
 
   ######### 4.Run Non-spatial Evolution #########
   for i in range(generations):
-    print(i," generation")
+    print("\n", i," generation")
     model.calculator(X_train, y_train, X_val, y_val)
     model.selection()
     model.evolution(population, cv_switch, selection_percent)

@@ -1,6 +1,7 @@
 #import neural network pacakages
 from re import A
 from scipy.misc import face
+from scipy.spatial import distance
 from sklearn.neural_network import MLPClassifier
 from copy import deepcopy
 
@@ -46,6 +47,7 @@ class Spatial_GA:
         self.all_train_score = []
         self.all_val_score = []
         self.neighbors = []
+        self.diversity = []
 
     def birth(self, population, hid_nodes, X_train, y_train):
         """
@@ -139,7 +141,7 @@ class Spatial_GA:
             shape = self.NNs[idx]["model"].coefs_[i].shape
             mutate_idx = np.random.choice(coef_size, size=int(mut_rate * coef_size))
             for loci in mutate_idx:
-                self.NNs[idx]["model"].coefs_[i].flat[loci] += np.random.normal(loc=0.05)
+                self.NNs[idx]["model"].coefs_[i].flat[loci] += np.random.normal(loc=0.005)
             self.NNs[idx]["model"].coefs_[i].reshape(shape)
         return None
     
@@ -154,11 +156,27 @@ class Spatial_GA:
                 self.NNs[idx] = deepcopy(self.NNs_copy[self.identify_max_neighbor(i,j,dim,neigh_size)])
                 self.mutate(idx, mut_rate)
 
+    def cosine_sim(self):
+        current_div = []
+        for ind1 in self.NNs:
+            for ind2 in self.NNs:
+                if ind1 >= ind2:
+                    continue
+                dist = distance.cosine(np.concatenate((np.ravel([self.NNs[ind1]["model"].coefs_[0]]),
+                                                    np.ravel([self.NNs[ind1]["model"].coefs_[1]]))), 
+                                    np.concatenate((np.ravel([self.NNs[ind2]["model"].coefs_[0]]), 
+                                                    np.ravel([self.NNs[ind2]["model"].coefs_[1]]))))
+                current_div.append(dist)
+        div_score = np.mean(current_div)
+        self.diversity.append(div_score)
+        print("Cosine Similarity: ", div_score,"\n")
+
 def run():
 
     ######### 1.Set Hyperparameters #########
     generations = int(sys.argv[1]) #10
     dimension = int(sys.argv[2]) #10
+    cv_switch = int(sys.argv[3])
     population = dimension ** 2
     hid_nodes = 10 #int(sys.argv[3]) #10
     mut_rate = 0.05 #float(sys.argv[4]) #0.05
@@ -179,6 +197,8 @@ def run():
         if i%10 == 0:
             spaceGA.plot_growth(val_score, dimension, i)
         spaceGA.probe_neighbors(dimension, neighbor_size, mut_rate)
+        if cv_switch:
+            spaceGA.cosine_sim()
 
     ######### 5.Plot Result #########
     spaceGA.plot_final()
