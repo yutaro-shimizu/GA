@@ -108,10 +108,16 @@ class Spatial_GA:
         plt.figure(facecolor="black")
         plt.plot(self.all_train_score, label = "training")
         plt.plot(self.all_val_score, label = "validation")
-        plt.xlabel("generations")
-        plt.ylabel("max accuracy of individual")
+        plt.xlabel("Generations")
+        plt.ylabel("Max Accuracy")
         plt.legend()
-        plt.savefig('./Figures/final.png', transparent=True)
+        plt.savefig('./Figures/saptial_final.png', transparent=True)
+
+        plt.figure(facecolor="black")
+        plt.plot(self.diversity)
+        plt.xlabel("Generations")
+        plt.ylabel("Cosine Similarity")
+        plt.savefig('./Figures/spatial_diversity.png', transparent=True)
 
     def identify_max_neighbor(self, i, j, dim, neigh_size): 
         score = self.NNs_copy[i * dim + j]["train_score"]
@@ -129,7 +135,7 @@ class Spatial_GA:
                     idx = ((i + k) % dim) * dim + (j + l) % dim
         return idx
 
-    def mutate(self, idx, mut_rate):
+    def mutate(self, idx, mut_rate=0.5):
         """
         In each layer, mutate weights at random cites with probability "mut_rate"
         ---
@@ -145,7 +151,7 @@ class Spatial_GA:
             self.NNs[idx]["model"].coefs_[i].reshape(shape)
         return None
     
-    def probe_neighbors(self,dim,neigh_size,mut_rate=0.05):
+    def probe_neighbors(self,dim,neigh_size):
         """
         - Check every cell and apply probabilistic replacement and mutation
         - Mutation happens for each layer
@@ -154,7 +160,7 @@ class Spatial_GA:
             for j in range(dim): #for every column
                 idx = i*dim+j # convert row and column notations to an index 
                 self.NNs[idx] = deepcopy(self.NNs_copy[self.identify_max_neighbor(i,j,dim,neigh_size)])
-                self.mutate(idx, mut_rate)
+                self.mutate(idx)
 
     def cosine_sim(self):
         current_div = []
@@ -176,12 +182,16 @@ def run():
     ######### 1.Set Hyperparameters #########
     generations = int(sys.argv[1]) #10
     dimension = int(sys.argv[2]) #10
-    cv_switch = int(sys.argv[3])
+    div_switch = int(sys.argv[3])
     population = dimension ** 2
     hid_nodes = 10 #int(sys.argv[3]) #10
-    mut_rate = 0.05 #float(sys.argv[4]) #0.05
+    mut_rate = 0.5 #float(sys.argv[4]) #0.05
     neighbor_size = 3
-    
+
+    print("Total arguments: ", len(sys.argv))
+    print("generations: ", sys.argv[1])
+    print("population: ", sys.argv[2])
+        
     ######### 2.Load Data #########
     X_train, X_val, X_test, y_train, y_val, y_test = load_data()
 
@@ -196,13 +206,12 @@ def run():
         ######### Plot growth per 10 iterations #########
         if i%10 == 0:
             spaceGA.plot_growth(val_score, dimension, i)
-        spaceGA.probe_neighbors(dimension, neighbor_size, mut_rate)
-        if cv_switch:
+        spaceGA.probe_neighbors(dimension, neighbor_size)
+        if div_switch:
             spaceGA.cosine_sim()
 
     ######### 5.Plot Result #########
     spaceGA.plot_final()
-
     return None
 
 if __name__ == "__main__":

@@ -135,8 +135,6 @@ class NonSpatial_GA:
 
         child.append(child_coefs.reshape(shape)) # child of weights and biases
       children[i] = child # put child in the population of children
-
-    print("Evolution complete")
     self.inject_weights(children)
 
   def cosine_sim(self):
@@ -170,19 +168,20 @@ class NonSpatial_GA:
     plt.xlabel("Generations")
     plt.ylabel("Max accuracy")
     plt.legend()
-    plt.savefig('./Figures/final_nonspatial.png', transparent=True)
+    plt.savefig('./Figures/nonspatial_final.png', transparent=True)
 
-    # plt.figure(facecolor="black")
-    # plt.plot(self.diversity)
-    # plt.xlabel("Generations")
-    # plt.ylabel("Mean Diversity")
-    # plt.savefig('./Figures/nonspatial_diversity.png', transparent=True)
+    plt.figure(facecolor="black")
+    plt.plot(self.diversity)
+    plt.xlabel("Generations")
+    plt.ylabel("Cosine Similarity")
+    plt.savefig('./Figures/nonspatial_diversity.png', transparent=True)
 
 def run():
   ############## 1. import hyperparameters ##############
   # input hyperparameters from the shell script
   generations = int(sys.argv[1]) #10
   population = int(sys.argv[2]) #10
+  div_switch = int(sys.argv[3])
   hid_nodes = 10 #int(sys.argv[3]) #10
   selection_percent = 0.2 #int(sys.argv[4]) #20
   cv_switch = False #bool(sys.argv[5])
@@ -199,12 +198,14 @@ def run():
 
   ######### 4.Run Non-spatial Evolution #########
   for i in range(generations):
-    print("\n", i," generation")
+    print("\ncurrent generation: ", i)
     model.calculator(X_train, y_train, X_val, y_val)
     model.selection()
     model.evolution(population, cv_switch, selection_percent)
-    # model.cosine_sim()
+    if div_switch:
+      model.cosine_sim()
   model.plot()
+  return None
 
 if __name__ == "__main__":
     run() 
