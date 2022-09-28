@@ -125,15 +125,23 @@ class Spatial_GA:
         llim = - int(neigh_size / 2)
         rlim = int(neigh_size / 2)
 
-        """
-        ################### add probabilistic replacement###########
-        """
+        indices_lst = []
+        sum_fit = 0
+        prob_fit = []
+        
         for k in range(llim,rlim+1):
             for l in range(llim,rlim+1):
-                if score < self.NNs_copy[((i + k) % dim) * dim + (j + l) % dim]["train_score"]:
-                    score = self.NNs_copy[((i + k) % dim) * dim + (j + l) % dim]["train_score"]
-                    idx = ((i + k) % dim) * dim + (j + l) % dim
-        return idx
+                prob_fit.append(self.NNs_copy[((i + k) % dim) * dim + (j + l) % dim]["train_score"])
+                indices_lst.append(((i + k) % dim) * dim + (j + l) % dim)
+                ### for deterministic replacement, comment out the following lines###
+                # if score < self.NNs_copy[((i + k) % dim) * dim + (j + l) % dim]["train_score"]:
+                #     score = self.NNs_copy[((i + k) % dim) * dim + (j + l) % dim]["train_score"]
+                #     idx = ((i + k) % dim) * dim + (j + l) % dim
+        
+        ### roulette wheel selection ###
+        sum_fit = sum(prob_fit)
+        idx = np.random.choice(indices_lst, 1, p=prob_fit/sum_fit)
+        return idx[0]
 
     def mutate(self, idx, mut_rate=0.5):
         """
@@ -159,7 +167,7 @@ class Spatial_GA:
         for i in range(dim): # for every row
             for j in range(dim): #for every column
                 idx = i*dim+j # convert row and column notations to an index 
-                self.NNs[idx] = deepcopy(self.NNs_copy[self.identify_max_neighbor(i,j,dim,neigh_size)])
+                self.NNs[idx] = deepcopy(self.NNs_copy[self.identify_max_neighbor(i, j, dim, neigh_size)])
                 self.mutate(idx)
 
     def cosine_sim(self):
@@ -177,20 +185,23 @@ class Spatial_GA:
         self.diversity.append(div_score)
         print("Cosine Similarity: ", div_score,"\n")
 
+# def confusion_matrix():
+# 
+
 def run():
 
     ######### 1.Set Hyperparameters #########
-    generations = int(sys.argv[1]) #10
-    dimension = int(sys.argv[2]) #10
-    div_switch = int(sys.argv[3])
+    generations = 10 #int(sys.argv[1]) #10
+    dimension = 10 #int(sys.argv[2]) #10
+    div_switch = 1 #int(sys.argv[3])
     population = dimension ** 2
     hid_nodes = 10 #int(sys.argv[3]) #10
     mut_rate = 0.5 #float(sys.argv[4]) #0.05
     neighbor_size = 3
 
-    print("Total arguments: ", len(sys.argv))
-    print("generations: ", sys.argv[1])
-    print("population: ", sys.argv[2])
+    # print("Total arguments: ", len(sys.argv))
+    # print("generations: ", sys.argv[1])
+    # print("population: ", sys.argv[2])
         
     ######### 2.Load Data #########
     X_train, X_val, X_test, y_train, y_val, y_test = load_data()
