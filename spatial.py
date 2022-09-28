@@ -140,7 +140,7 @@ class Spatial_GA:
         
         ### roulette wheel selection ###
         sum_fit = sum(prob_fit)
-        idx = np.random.choice(indices_lst, 1, p=prob_fit/sum_fit)
+        idx = np.random.choice(indices_lst, 1, p=prob_fit/sum_fit) # returns index as nd array
         return idx[0]
 
     def mutate(self, idx, mut_rate=0.5):
@@ -191,17 +191,17 @@ class Spatial_GA:
 def run():
 
     ######### 1.Set Hyperparameters #########
-    generations = 10 #int(sys.argv[1]) #10
-    dimension = 10 #int(sys.argv[2]) #10
-    div_switch = 1 #int(sys.argv[3])
+    generations = int(sys.argv[1]) #10
+    dimension = int(sys.argv[2]) #10
+    div_switch = int(sys.argv[3])
     population = dimension ** 2
     hid_nodes = 10 #int(sys.argv[3]) #10
     mut_rate = 0.5 #float(sys.argv[4]) #0.05
     neighbor_size = 3
 
-    # print("Total arguments: ", len(sys.argv))
-    # print("generations: ", sys.argv[1])
-    # print("population: ", sys.argv[2])
+    print("Total arguments: ", len(sys.argv))
+    print("generations: ", sys.argv[1])
+    print("population: ", sys.argv[2])
         
     ######### 2.Load Data #########
     X_train, X_val, X_test, y_train, y_val, y_test = load_data()
