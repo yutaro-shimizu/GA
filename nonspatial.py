@@ -9,6 +9,7 @@ from copy import deepcopy
 
 import pandas as pd
 from matplotlib import pyplot as plt #package for visualization
+from datetime import datetime
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -152,36 +153,47 @@ class NonSpatial_GA:
     self.diversity.append(div_score)
     print("Cosine Similarity: ", div_score,"\n")
 
-  def plot(self):
-    COLOUR = 'white'
-    plt.rcParams['text.color'] = COLOUR
-    plt.rcParams['axes.labelcolor'] = COLOUR
-    plt.rcParams['axes.edgecolor'] = COLOUR
-    plt.rcParams['axes.facecolor'] = 'black'
-    plt.rcParams['xtick.color'] = COLOUR
-    plt.rcParams['ytick.color'] = COLOUR
+  # def plot(self):
+  #   COLOUR = 'white'
+  #   plt.rcParams['text.color'] = COLOUR
+  #   plt.rcParams['axes.labelcolor'] = COLOUR
+  #   plt.rcParams['axes.edgecolor'] = COLOUR
+  #   plt.rcParams['axes.facecolor'] = 'black'
+  #   plt.rcParams['xtick.color'] = COLOUR
+  #   plt.rcParams['ytick.color'] = COLOUR
 
-    plt.figure(facecolor="black")
-    plt.plot(self.all_train_score, label = "training")
-    plt.plot(self.all_val_score, label = "validation")
-    plt.legend()
-    plt.xlabel("Generations")
-    plt.ylabel("Max accuracy")
-    plt.legend()
-    plt.savefig('./Figures/nonspatial_final.png', transparent=True)
+  #   plt.figure(facecolor="black")
+  #   plt.plot(self.all_train_score, label = "training")
+  #   plt.plot(self.all_val_score, label = "validation")
+  #   plt.legend()
+  #   plt.xlabel("Generations")
+  #   plt.ylabel("Max accuracy")
+  #   plt.legend()
+  #   plt.savefig('./Figures/nonspatial_final.png', transparent=True)
 
-    plt.figure(facecolor="black")
-    plt.plot(self.diversity)
-    plt.xlabel("Generations")
-    plt.ylabel("Cosine Similarity")
-    plt.savefig('./Figures/nonspatial_diversity.png', transparent=True)
+  #   plt.figure(facecolor="black")
+  #   plt.plot(self.diversity)
+  #   plt.xlabel("Generations")
+  #   plt.ylabel("Cosine Similarity")
+  #   plt.savefig('./Figures/nonspatial_diversity.png', transparent=True)
+
+  def store_result(self, hyp_params):
+          now = datetime.now().strftime("%y%m%d%H%M%S")
+
+          d = {"train_score":self.all_train_score,
+          "val_score":self.all_val_score,
+          "cos_sim":self.diversity,
+          "hyp_params":hyp_params}
+          df = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in d.items() ]))
+          df.to_csv(f"./results/result_nonspatial{now}.csv")
+
+# def confusion_matrix()
 
 def run():
   ############## 1. import hyperparameters ##############
   # input hyperparameters from the shell script
   generations = int(sys.argv[1]) #10
   population = int(sys.argv[2]) #10
-  div_switch = int(sys.argv[3])
   hid_nodes = 10 #int(sys.argv[3]) #10
   selection_percent = 0.2 #int(sys.argv[4]) #20
   cv_switch = False #bool(sys.argv[5])
@@ -202,9 +214,12 @@ def run():
     model.calculator(X_train, y_train, X_val, y_val)
     model.selection()
     model.evolution(population, cv_switch, selection_percent)
-    if div_switch:
-      model.cosine_sim()
-  model.plot()
+    model.cosine_sim()
+  model.store_result([generations, 
+                      population, 
+                      hid_nodes, 
+                      selection_percent,
+                      cv_switch])
   return None
 
 if __name__ == "__main__":

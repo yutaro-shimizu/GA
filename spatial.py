@@ -9,6 +9,7 @@ import numpy as np
 import random 
 import pandas as pd
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 import sys
 import warnings
@@ -95,31 +96,42 @@ class Spatial_GA:
         plt.colorbar(im)
         plt.savefig(f'./Figures/figure{i}.png', transparent=True)
 
-    def plot_final(self):
+    # def plot_final(self):
 
-        COLOUR = 'white'
-        plt.rcParams['text.color'] = COLOUR
-        plt.rcParams['axes.labelcolor'] = COLOUR
-        plt.rcParams['axes.edgecolor'] = COLOUR
-        plt.rcParams['axes.facecolor'] = 'black'
-        plt.rcParams['xtick.color'] = COLOUR
-        plt.rcParams['ytick.color'] = COLOUR
+    #     COLOUR = 'white'
+    #     plt.rcParams['text.color'] = COLOUR
+    #     plt.rcParams['axes.labelcolor'] = COLOUR
+    #     plt.rcParams['axes.edgecolor'] = COLOUR
+    #     plt.rcParams['axes.facecolor'] = 'black'
+    #     plt.rcParams['xtick.color'] = COLOUR
+    #     plt.rcParams['ytick.color'] = COLOUR
 
-        plt.figure(facecolor="black")
-        plt.plot(self.all_train_score, label = "training")
-        plt.plot(self.all_val_score, label = "validation")
-        plt.xlabel("Generations")
-        plt.ylabel("Max Accuracy")
-        plt.legend()
-        plt.savefig('./Figures/saptial_final.png', transparent=True)
+    #     plt.figure(facecolor="black")
+    #     plt.plot(self.all_train_score, label = "training")
+    #     plt.plot(self.all_val_score, label = "validation")
+    #     plt.xlabel("Generations")
+    #     plt.ylabel("Max Accuracy")
+    #     plt.legend()
+    #     plt.savefig('./Figures/saptial_final.png', transparent=True)
 
-        plt.figure(facecolor="black")
-        plt.plot(self.diversity)
-        plt.xlabel("Generations")
-        plt.ylabel("Cosine Similarity")
-        plt.savefig('./Figures/spatial_diversity.png', transparent=True)
+    #     plt.figure(facecolor="black")
+    #     plt.plot(self.diversity)
+    #     plt.xlabel("Generations")
+    #     plt.ylabel("Cosine Similarity")
+    #     plt.savefig('./Figures/spatial_diversity.png', transparent=True)
 
-    def identify_max_neighbor(self, i, j, dim, neigh_size): 
+    def store_result(self, hyp_params):
+        now = datetime.now().strftime("%y%m%d%H%M%S")
+
+        d = {"train_score":self.all_train_score,
+        "val_score":self.all_val_score,
+        "cos_sim":self.diversity,
+        "hyp_params":hyp_params}
+        df = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in d.items() ]))
+
+        df.to_csv(f"./results/result_spatial{now}.csv")
+
+    def identify_max_neighbor(self, i, j, dim, neigh_size, rou_switch): 
         score = self.NNs_copy[i * dim + j]["train_score"]
         idx = i * dim + j
         llim = - int(neigh_size / 2)
@@ -127,21 +139,24 @@ class Spatial_GA:
 
         indices_lst = []
         sum_fit = 0
-        prob_fit = []
+        fit_lst = []
         
         for k in range(llim,rlim+1):
             for l in range(llim,rlim+1):
-                prob_fit.append(self.NNs_copy[((i + k) % dim) * dim + (j + l) % dim]["train_score"])
-                indices_lst.append(((i + k) % dim) * dim + (j + l) % dim)
-                ### for deterministic replacement, comment out the following lines###
-                # if score < self.NNs_copy[((i + k) % dim) * dim + (j + l) % dim]["train_score"]:
-                #     score = self.NNs_copy[((i + k) % dim) * dim + (j + l) % dim]["train_score"]
-                #     idx = ((i + k) % dim) * dim + (j + l) % dim
-        
+                ### roulette wheel selection ###
+                if rou_switch:
+                    fit_lst.append(self.NNs_copy[((i + k) % dim) * dim + (j + l) % dim]["train_score"])
+                    indices_lst.append(((i + k) % dim) * dim + (j + l) % dim)
+                ### deterministic replacement###
+                else:
+                    if score < self.NNs_copy[((i + k) % dim) * dim + (j + l) % dim]["train_score"]:
+                        score = self.NNs_copy[((i + k) % dim) * dim + (j + l) % dim]["train_score"]
+                        idx = ((i + k) % dim) * dim + (j + l) % dim
         ### roulette wheel selection ###
-        sum_fit = sum(prob_fit)
-        idx = np.random.choice(indices_lst, 1, p=prob_fit/sum_fit) # returns index as nd array
-        return idx[0]
+        if rou_switch:
+            sum_fit = sum(fit_lst)
+            idx = np.random.choice(indices_lst, 1, p = fit_lst / sum_fit)[0] # returns index as nd array
+        return idx
 
     def mutate(self, idx, mut_rate=0.5):
         """
@@ -159,7 +174,7 @@ class Spatial_GA:
             self.NNs[idx]["model"].coefs_[i].reshape(shape)
         return None
     
-    def probe_neighbors(self,dim,neigh_size):
+    def probe_neighbors(self, dim, neigh_size, rou_switch):
         """
         - Check every cell and apply probabilistic replacement and mutation
         - Mutation happens for each layer
@@ -167,7 +182,7 @@ class Spatial_GA:
         for i in range(dim): # for every row
             for j in range(dim): #for every column
                 idx = i*dim+j # convert row and column notations to an index 
-                self.NNs[idx] = deepcopy(self.NNs_copy[self.identify_max_neighbor(i, j, dim, neigh_size)])
+                self.NNs[idx] = deepcopy(self.NNs_copy[self.identify_max_neighbor(i, j, dim, neigh_size, rou_switch)])
                 self.mutate(idx)
 
     def cosine_sim(self):
@@ -193,15 +208,15 @@ def run():
     ######### 1.Set Hyperparameters #########
     generations = int(sys.argv[1]) #10
     dimension = int(sys.argv[2]) #10
-    div_switch = int(sys.argv[3])
+    rou_switch = int(sys.argv[3])
     population = dimension ** 2
-    hid_nodes = 10 #int(sys.argv[3]) #10
-    mut_rate = 0.5 #float(sys.argv[4]) #0.05
+    hid_nodes = 10 #int(sys.argv[4]) #10
+    mut_rate = 0.5 #float(sys.argv[5]) #0.05
     neighbor_size = 3
-
+    
     print("Total arguments: ", len(sys.argv))
     print("generations: ", sys.argv[1])
-    print("population: ", sys.argv[2])
+    print("population: ", dimension ** 2)
         
     ######### 2.Load Data #########
     X_train, X_val, X_test, y_train, y_val, y_test = load_data()
@@ -214,15 +229,19 @@ def run():
     for i in range(generations):
         print("\ncurrent generation: ", i)
         val_score = spaceGA.calculator(X_train, y_train, X_val, y_val)
-        ######### Plot growth per 10 iterations #########
-        if i%10 == 0:
-            spaceGA.plot_growth(val_score, dimension, i)
-        spaceGA.probe_neighbors(dimension, neighbor_size)
-        if div_switch:
-            spaceGA.cosine_sim()
+        # ######### Plot growth per 10 iterations #########
+        # if i%10 == 0:
+        #     spaceGA.plot_growth(val_score, dimension, i)
+        spaceGA.probe_neighbors(dimension, neighbor_size, rou_switch)
+        spaceGA.cosine_sim()
 
-    ######### 5.Plot Result #########
-    spaceGA.plot_final()
+    ######### 5.Store Result #########
+    spaceGA.store_result([generations,
+                        dimension,
+                        population,
+                        hid_nodes,
+                        mut_rate,
+                        neighbor_size])
     return None
 
 if __name__ == "__main__":
