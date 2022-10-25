@@ -1,16 +1,20 @@
-import numpy as np
-import random
-import sys
-
-#import neural network pacakages
-from sklearn.neural_network import MLPClassifier
+from re import A
+from scipy.misc import face
 from scipy.spatial import distance
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import confusion_matrix
+from sklearn.preprocessing import normalize
+from scipy.special import kl_div
+from scipy.stats import entropy
 from copy import deepcopy
 
+import numpy as np
+import random 
 import pandas as pd
-from matplotlib import pyplot as plt #package for visualization
+import matplotlib.pyplot as plt
 from datetime import datetime
 
+import sys
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -46,7 +50,8 @@ class NonSpatial_GA:
         self.NNs_copy = {}  # for reference during evolution. Does not change during swaps.
         self.all_train_score = []
         self.all_val_score = []
-        self.diversity = []
+        self.cos_sim = []
+        self.entropy = []
 
   def birth(self, population, hid_nodes, X_train, y_train):
       """
@@ -67,23 +72,51 @@ class NonSpatial_GA:
           self.NNs[ind]["model"].coefs_[0] = np.random.random(size=(784, hid_nodes)) * np.sqrt(2/(784+10))/100
           self.NNs[ind]["model"].coefs_[1] = np.random.random(size=(hid_nodes, 10)) * np.sqrt(2/(784+10))/100
 
-
-  def calculator(self, X_train, y_train, X_val, y_val):
+  def score_calculator(self, X_train, y_train, X_val, y_val):
       """
       Calculate max score for each generation. Store max score in the array.
       """
       train_score = []
       val_score = []
+      cf_matrix = []
+
       for ind in self.NNs:
           self.NNs[ind]["train_score"]= self.NNs[ind]["model"].score(X_train, y_train) # calculate the score
           self.NNs[ind]["val_score"]= self.NNs[ind]["model"].score(X_val, y_val)
           train_score.append(self.NNs[ind]["train_score"])
           val_score.append(self.NNs[ind]["val_score"])
+
+          ## output confusion matrix and compute relative entropy
+          y_val_pred = self.NNs[ind]["model"].predict(X_val)
+          cf_matrix.append(confusion_matrix(y_val,y_val_pred))
+
       print("Max training score: ", np.amax(train_score))
       print("Max validation score: ", np.amax(val_score))
       self.all_train_score.append(np.amax(train_score))
       self.all_val_score.append(np.amax(val_score))
+
+      return val_score, cf_matrix
   
+  def entropy_calculator(self, cf_matrix):
+        """
+        Compute KL-divergence (distance between metrices) to characterize phenotype
+        normalize each row of the confusion matrix for KL-Divergence calculation
+        """
+        entropy_periter = []
+
+        for i in range(len(cf_matrix)):
+            for j in range(len(cf_matrix) - 1):
+                for row in range(10):
+                    # add 1e-4 to avoid overflow (division by 0 for log)
+                    entropy_periter.append(kl_div(normalize(1e-4+cf_matrix[i], axis=1, norm='l1')[row],
+                                                normalize(1e-4+cf_matrix[j+1], axis=1, norm='l1')[row]))
+
+
+        mean_KL = np.average(entropy_periter)
+        self.entropy.append(mean_KL)
+        print("KL-Divergence: ", mean_KL)
+        return None
+
   def selection(self):
     self.NNs = dict(sorted(self.NNs.items(), key = lambda NNs:(NNs[1]["train_score"], NNs[0]), reverse=True)) # sort the list for selection
     self.NNs = {i: v for i, v in enumerate(self.NNs.values())}  
@@ -150,10 +183,58 @@ class NonSpatial_GA:
                                                np.ravel([self.NNs[ind2]["model"].coefs_[1]]))))
         current_div.append(dist)
     div_score = np.mean(current_div)
-    self.diversity.append(div_score)
+    self.cos_sim.append(div_score)
     print("Cosine Similarity: ", div_score,"\n")
 
-  # def plot(self):
+  def store_result(self, hyp_params):
+          now = datetime.now().strftime("%y%m%d%H%M%S")
+
+          d = {"train_score":self.all_train_score,
+          "val_score":self.all_val_score,
+          "cos_sim":self.cos_sim,
+          "rel_ent":self.entropy,
+          "hyp_params":hyp_params}
+          df = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in d.items() ]))
+          df.to_csv(f"./results/result_nonspatial{now}.csv")
+
+def run():
+  ############## 1. import hyperparameters ##############
+  # input hyperparameters from the shell script
+  generations = int(sys.argv[1]) #10
+  population = int(sys.argv[2]) #10
+  hid_nodes = int(sys.argv[3]) #10
+  selection_percent = 0.2 #int(sys.argv[4]) #20
+  cv_switch = False #bool(sys.argv[5])
+  print("generations: ", generations)
+  print("population: ", population)
+
+  ############## 2. load data ##############
+  X_train, X_val, X_test, y_train, y_val, y_test = load_data()
+
+  ######### 3.Initialize Populatioin #########
+  model = NonSpatial_GA(hid_nodes)
+  model.birth(population, hid_nodes, X_train, y_train)
+
+  ######### 4.Run Non-spatial Evolution #########
+  for i in range(generations):
+    print("\ncurrent generation: ", i)
+    val_score, cf_matrix = model.score_calculator(X_train, y_train, X_val, y_val)
+    model.entropy_calculator(cf_matrix)
+    model.selection()
+    model.evolution(population, cv_switch, selection_percent)
+    model.cosine_sim()
+  model.store_result([generations, 
+                      population, 
+                      hid_nodes, 
+                      selection_percent,
+                      cv_switch])
+  return None
+
+if __name__ == "__main__":
+    run() 
+
+"""
+# def plot(self):
   #   COLOUR = 'white'
   #   plt.rcParams['text.color'] = COLOUR
   #   plt.rcParams['axes.labelcolor'] = COLOUR
@@ -176,51 +257,4 @@ class NonSpatial_GA:
   #   plt.xlabel("Generations")
   #   plt.ylabel("Cosine Similarity")
   #   plt.savefig('./Figures/nonspatial_diversity.png', transparent=True)
-
-  def store_result(self, hyp_params):
-          now = datetime.now().strftime("%y%m%d%H%M%S")
-
-          d = {"train_score":self.all_train_score,
-          "val_score":self.all_val_score,
-          "cos_sim":self.diversity,
-          "hyp_params":hyp_params}
-          df = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in d.items() ]))
-          df.to_csv(f"./results/result_nonspatial{now}.csv")
-
-# def confusion_matrix()
-
-def run():
-  ############## 1. import hyperparameters ##############
-  # input hyperparameters from the shell script
-  generations = int(sys.argv[1]) #10
-  population = int(sys.argv[2]) #10
-  hid_nodes = 10 #int(sys.argv[3]) #10
-  selection_percent = 0.2 #int(sys.argv[4]) #20
-  cv_switch = False #bool(sys.argv[5])
-  print("Total arguments: ", len(sys.argv))
-  print("generations: ", sys.argv[1])
-  print("population: ", sys.argv[2])
-
-  ############## 2. load data ##############
-  X_train, X_val, X_test, y_train, y_val, y_test = load_data()
-
-  ######### 3.Initialize Populatioin #########
-  model = NonSpatial_GA(hid_nodes)
-  model.birth(population, hid_nodes, X_train, y_train)
-
-  ######### 4.Run Non-spatial Evolution #########
-  for i in range(generations):
-    print("\ncurrent generation: ", i)
-    model.calculator(X_train, y_train, X_val, y_val)
-    model.selection()
-    model.evolution(population, cv_switch, selection_percent)
-    model.cosine_sim()
-  model.store_result([generations, 
-                      population, 
-                      hid_nodes, 
-                      selection_percent,
-                      cv_switch])
-  return None
-
-if __name__ == "__main__":
-    run() 
+  """

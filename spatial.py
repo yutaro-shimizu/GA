@@ -3,6 +3,10 @@ from re import A
 from scipy.misc import face
 from scipy.spatial import distance
 from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import confusion_matrix
+from sklearn.preprocessing import normalize
+from scipy.special import kl_div
+from scipy.stats import entropy
 from copy import deepcopy
 
 import numpy as np
@@ -48,7 +52,8 @@ class Spatial_GA:
         self.all_train_score = []
         self.all_val_score = []
         self.neighbors = []
-        self.diversity = []
+        self.cos_sim = []
+        self.entropy = []
 
     def birth(self, population, hid_nodes, X_train, y_train):
         """
@@ -64,25 +69,52 @@ class Spatial_GA:
             self.NNs[ind]["model"].coefs_[0] = np.random.uniform(low=-1, high=1, size=(784, hid_nodes)) 
             self.NNs[ind]["model"].coefs_[1] = np.random.uniform(low=-1, high=1, size=(hid_nodes, 10))
 
-    def calculator(self, X_train, y_train, X_val, y_val):
+    def score_calculator(self, X_train, y_train, X_val, y_val):
         """
         Calculate max score for each generation. Store max score in the array.
+        Also calculate confusion matrix.
         """
         train_score = []
         val_score = []
+        cf_matrix = []
+
         for ind in self.NNs:
             self.NNs[ind]["train_score"]= self.NNs[ind]["model"].score(X_train, y_train) # calculate the score
             self.NNs[ind]["val_score"]= self.NNs[ind]["model"].score(X_val, y_val)
             train_score.append(self.NNs[ind]["train_score"])
             val_score.append(self.NNs[ind]["val_score"])
+
+            ## output confusion matrix and compute relative entropy
+            y_val_pred = self.NNs[ind]["model"].predict(X_val)
+            cf_matrix.append(confusion_matrix(y_val,y_val_pred))
+
         self.NNs_copy = deepcopy(self.NNs) # copy original including the scores
         print("Max training score: ", np.amax(train_score))
         print("Max validation score: ", np.amax(val_score))
         self.all_train_score.append(np.amax(train_score))
         self.all_val_score.append(np.amax(val_score))
 
-        return val_score
+        return val_score, cf_matrix
     
+    def entropy_calculator(self, cf_matrix):
+        """
+        Compute KL-divergence (distance between metrices) to characterize phenotype
+        normalize each row of the confusion matrix for KL-Divergence calculation
+        """
+        entropy_periter = []
+
+        for i in range(len(cf_matrix)):
+            for j in range(len(cf_matrix) - 1):
+                for row in range(10):
+                    # add 1e-4 to avoid overflow (division by 0 for log)
+                    entropy_periter.append(kl_div(normalize(1e-4+cf_matrix[i], axis=1, norm='l1')[row],
+                                                normalize(1e-4+cf_matrix[j+1], axis=1, norm='l1')[row]))
+
+
+        mean_KL = np.average(entropy_periter)
+        self.entropy.append(mean_KL)
+        print("KL-Divergence: ", mean_KL)
+
     def plot_growth(self, val_score, dim, i):
 
         COLOUR = 'white'
@@ -96,40 +128,18 @@ class Spatial_GA:
         plt.colorbar(im)
         plt.savefig(f'./Figures/figure{i}.png', transparent=True)
 
-    # def plot_final(self):
-
-    #     COLOUR = 'white'
-    #     plt.rcParams['text.color'] = COLOUR
-    #     plt.rcParams['axes.labelcolor'] = COLOUR
-    #     plt.rcParams['axes.edgecolor'] = COLOUR
-    #     plt.rcParams['axes.facecolor'] = 'black'
-    #     plt.rcParams['xtick.color'] = COLOUR
-    #     plt.rcParams['ytick.color'] = COLOUR
-
-    #     plt.figure(facecolor="black")
-    #     plt.plot(self.all_train_score, label = "training")
-    #     plt.plot(self.all_val_score, label = "validation")
-    #     plt.xlabel("Generations")
-    #     plt.ylabel("Max Accuracy")
-    #     plt.legend()
-    #     plt.savefig('./Figures/saptial_final.png', transparent=True)
-
-    #     plt.figure(facecolor="black")
-    #     plt.plot(self.diversity)
-    #     plt.xlabel("Generations")
-    #     plt.ylabel("Cosine Similarity")
-    #     plt.savefig('./Figures/spatial_diversity.png', transparent=True)
-
     def store_result(self, hyp_params):
         now = datetime.now().strftime("%y%m%d%H%M%S")
 
         d = {"train_score":self.all_train_score,
         "val_score":self.all_val_score,
-        "cos_sim":self.diversity,
+        "cos_sim":self.cos_sim,
+        "rel_ent":self.entropy,
         "hyp_params":hyp_params}
         df = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in d.items() ]))
 
         df.to_csv(f"./results/result_spatial{now}.csv")
+        print(f"result stored as: result_spatial{now}.csv")
 
     def identify_max_neighbor(self, i, j, dim, neigh_size, rou_switch): 
         score = self.NNs_copy[i * dim + j]["train_score"]
@@ -197,11 +207,8 @@ class Spatial_GA:
                                                     np.ravel([self.NNs[ind2]["model"].coefs_[1]]))))
                 current_div.append(dist)
         div_score = np.mean(current_div)
-        self.diversity.append(div_score)
+        self.cos_sim.append(div_score)
         print("Cosine Similarity: ", div_score,"\n")
-
-# def confusion_matrix():
-# 
 
 def run():
 
@@ -213,10 +220,8 @@ def run():
     hid_nodes = 10 #int(sys.argv[4]) #10
     mut_rate = 0.5 #float(sys.argv[5]) #0.05
     neighbor_size = 3
-    
-    print("Total arguments: ", len(sys.argv))
-    print("generations: ", sys.argv[1])
-    print("population: ", dimension ** 2)
+    print("generations: ", generations)
+    print("population: ", population)
         
     ######### 2.Load Data #########
     X_train, X_val, X_test, y_train, y_val, y_test = load_data()
@@ -228,7 +233,8 @@ def run():
     ######### 4.Run Spatial Evolution #########
     for i in range(generations):
         print("\ncurrent generation: ", i)
-        val_score = spaceGA.calculator(X_train, y_train, X_val, y_val)
+        val_score, cf_matrix = spaceGA.score_calculator(X_train, y_train, X_val, y_val)
+        spaceGA.entropy_calculator(cf_matrix)
         # ######### Plot growth per 10 iterations #########
         # if i%10 == 0:
         #     spaceGA.plot_growth(val_score, dimension, i)
@@ -246,3 +252,29 @@ def run():
 
 if __name__ == "__main__":
     run()
+
+    """
+    # def plot_final(self):
+
+    #     COLOUR = 'white'
+    #     plt.rcParams['text.color'] = COLOUR
+    #     plt.rcParams['axes.labelcolor'] = COLOUR
+    #     plt.rcParams['axes.edgecolor'] = COLOUR
+    #     plt.rcParams['axes.facecolor'] = 'black'
+    #     plt.rcParams['xtick.color'] = COLOUR
+    #     plt.rcParams['ytick.color'] = COLOUR
+
+    #     plt.figure(facecolor="black")
+    #     plt.plot(self.all_train_score, label = "training")
+    #     plt.plot(self.all_val_score, label = "validation")
+    #     plt.xlabel("Generations")
+    #     plt.ylabel("Max Accuracy")
+    #     plt.legend()
+    #     plt.savefig('./Figures/saptial_final.png', transparent=True)
+
+    #     plt.figure(facecolor="black")
+    #     plt.plot(self.cos_sim)
+    #     plt.xlabel("Generations")
+    #     plt.ylabel("Cosine Similarity")
+    #     plt.savefig('./Figures/spatial_diversity.png', transparent=True)
+    """
