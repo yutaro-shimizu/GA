@@ -202,7 +202,7 @@ def run():
   # input hyperparameters from the shell script
   generations = int(sys.argv[1]) #10
   population = int(sys.argv[2]) #10
-  hid_nodes = int(sys.argv[3]) #10
+  hid_nodes = 10 #pint(sys.argv[3]) #10
   selection_percent = 0.2 #int(sys.argv[4]) #20
   cv_switch = False #bool(sys.argv[5])
   print("generations: ", generations)
