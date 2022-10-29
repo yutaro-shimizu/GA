@@ -208,7 +208,7 @@ def run():
   print("generations: ", generations)
   print("population: ", population)
 
-  ############## 2. load data ##############
+  ############## 2. Load Data ##############
   X_train, X_val, X_test, y_train, y_val, y_test = load_data()
 
   ######### 3.Initialize Populatioin #########

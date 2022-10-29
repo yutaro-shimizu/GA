@@ -21,7 +21,7 @@ warnings.filterwarnings('ignore')
 
 def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
     # load data
-    print("load data")
+    print("\nload data")
 
     data_train = pd.read_csv(train_csv) # load MNIST training data in
     data_train = np.array(data_train)   # turn into array
@@ -47,7 +47,7 @@ def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 class Spatial_Coev_GA():
-    def __init__(self, hid_nodes):
+    def __init__(self):
         self.NNs = {} # set of models for evolution. Swaps based on training score during evolution. 
         self.NNs_copy = {}  # for reference during evolution. Does not change during swaps.
         self.all_train_score = []
@@ -171,7 +171,7 @@ class Spatial_Coev_GA():
         return idx
 
     # 2.3 mutation both host and parasite
-    def mutation_host(self, idx, mut_rate=0.5):
+    def mutation_host(self, idx, mut_rate=0.5, mut_amount=0.005):
         """
         In each layer, mutate weights at random cites with probability "mut_rate"
         ---
@@ -186,11 +186,11 @@ class Spatial_Coev_GA():
 
             # mutate values
             for loci in mutation_sites:
-                self.NNs[idx]["model"].coefs_[i].flat[loci] += np.random.normal(loc=0.005)
+                self.NNs[idx]["model"].coefs_[i].flat[loci] += np.random.normal(loc=mut_amount)
             self.NNs[idx]["model"].coefs_[i].reshape(shape)
         return None
     
-    def mutation_parasite(self, idx, mut_rate=0.5):
+    def mutation_parasite(self, idx, mut_rate=0.5, mut_amount=10):
         for image in self.NNs[idx]["parasite_X_train"]:
             # randomly select mutation sites
             shape = image.shape[0]
@@ -198,11 +198,18 @@ class Spatial_Coev_GA():
 
             # mutate values
             for loci in mutation_sites:
-                image[loci] += np.random.normal(loc=50)
+                image[loci] += np.random.normal(loc=mut_amount)
         return None
 
     # 2.4 combine methods to coevolve the population
-    def coevolution(self, dim, neigh_size, rou_switch):
+    def coevolution(self, 
+                    dim, 
+                    neigh_size, 
+                    rou_switch, 
+                    host_mut_rate, 
+                    host_mut_amount, 
+                    parasite_mut_rate,
+                    parasite_mut_amount):
         """
         - Check every cell and apply probabilistic replacement and mutation
         - Mutation happens for each layer
@@ -220,8 +227,8 @@ class Spatial_Coev_GA():
                 self.NNs[idx]["parasite_X_train"] = deepcopy(self.NNs_copy[parasite_new_idx]["parasite_X_train"])
                 self.NNs[idx]["parasite_y_train"] = deepcopy(self.NNs_copy[parasite_new_idx]["parasite_y_train"])
 
-                self.mutation_host(idx)
-                self.mutation_parasite(idx)
+                self.mutation_host(idx, host_mut_rate, host_mut_amount)
+                self.mutation_parasite(idx, parasite_mut_rate, parasite_mut_amount)
 
     ############## 3.Measure phenotype, genotype and store result ##############
     def entropy_calculator(self, cf_matrix):
@@ -265,7 +272,7 @@ class Spatial_Coev_GA():
 
         d = {"train_score":self.all_train_score,
         "val_score":self.all_val_score,
-        "mnist_score":self.mnist_score,
+        "mnist_score":self.all_parasite_score,
         "cos_sim":self.cos_sim,
         "rel_ent":self.entropy,
         "hyp_params":hyp_params}
@@ -276,34 +283,56 @@ class Spatial_Coev_GA():
 
 def run():
    ######### 1.Set Hyperparameters #########
-    generations = 10 #int(sys.argv[1]) #10
-    dimension = 10# int(sys.argv[2]) #10
+    generations = int(input("Enter generations: ")) #10
+    dimension = int(input("Enter dimension: ")) #10
     rou_switch = 0 #int(sys.argv[3])
     population = dimension ** 2
     hid_nodes = 10 #int(sys.argv[4]) #10
-    mut_rate = 0.5 #float(sys.argv[5]) #0.05
+    host_mut_rate = float(input("FOR HOST Enter mutation RATE (default 0.5): "))
+    host_mut_amount = float(input("FOR HOST Enter mutation AMOUNT (default 0.005): "))
+    parasite_mut_rate = float(input("FOR PARASITE Enter mutation RATE: "))
+    parasite_mut_amount = int(input("FOR PARASITE Enter mutation AMOUNT: "))
     neighbor_size = 3
-    print("generations: ", generations)
-    print("population: ", population)
+    print("\nGenerations: ", generations)
+    print("Population: ", population)
+    print("Host mutation rate: ", host_mut_rate, "\nHost mutation amount: ", host_mut_amount)
+    print("Parasite mutation rate: ", parasite_mut_rate, "\nParasite mutation amount: ", parasite_mut_amount)
         
     ######### 2.Load Data #########
     X_train, X_val, X_test, y_train, y_val, y_test = load_data()
 
     ######### 3.Initialize Population(host, and parasite) #########
-    model = Spatial_Coev_GA(hid_nodes)
+    model = Spatial_Coev_GA()
     model.birth(population, hid_nodes, X_train, y_train)
     
     ######### 4. Run Non-spatial *CoEvolution #########
     for i in range(generations):
         print("\ncurrent generation: ", i)
-        val_score, cf_matrix = model.fitness(X_train, y_train, X_val, y_val, population)
-        model.coevolution(dimension, neighbor_size, rou_switch)
+        val_score, cf_matrix = model.fitness(X_train, 
+                                             y_train, 
+                                             X_val, 
+                                             y_val, 
+                                             population)
+        model.coevolution(dimension, 
+                          neighbor_size, 
+                          rou_switch, 
+                          host_mut_rate, 
+                          host_mut_amount,
+                          parasite_mut_rate,
+                          parasite_mut_amount)
         
         model.entropy_calculator(cf_matrix)
         model.cosine_sim()
-    model.store_result([generations, 
-                      population, 
-                      hid_nodes])
+    model.store_result([generations,
+                        dimension,
+                        rou_switch,
+                        population,
+                        hid_nodes,
+                        host_mut_rate,
+                        host_mut_amount,
+                        parasite_mut_rate,
+                        parasite_mut_amount,
+                        neighbor_size])
     return None
 
 if __name__ == "__main__":
