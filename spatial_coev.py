@@ -50,9 +50,9 @@ class Spatial_Coev_GA():
     def __init__(self, hid_nodes):
         self.NNs = {} # set of models for evolution. Swaps based on training score during evolution. 
         self.NNs_copy = {}  # for reference during evolution. Does not change during swaps.
-        self.mnist_score = [] # track parasite score
         self.all_train_score = []
         self.all_val_score = []
+        self.all_parasite_score = []
         self.neighbors = []
         self.cos_sim = []
         self.entropy = []
@@ -70,7 +70,6 @@ class Spatial_Coev_GA():
             - parasites (10 digits from each class)
         """
         for ind in range(population):
-            ### 1.1 populate host (Neural Network Classifiers) ###
             self.NNs[ind] = {"model": MLPClassifier(hidden_layer_sizes=(hid_nodes,), 
                                                     max_iter=1, 
                                                     alpha=1e-4,
@@ -78,7 +77,12 @@ class Spatial_Coev_GA():
                                                     verbose=False, 
                                                     learning_rate_init=.1),
                             "train_score": 0,
-                            "val_score": 0}
+                            "val_score": 0,
+                            "parasite_X_train": None,
+                            "parasite_y_train": None,
+                            "parasite_score": 0}
+
+            ### 1.1 populate host (Neural Network Classifiers) ###
             self.NNs[ind]["model"].fit(X_train, y_train) # fit the network to initialize W and b
             # randomly initialize weights and biases
             self.NNs[ind]["model"].coefs_[0] = np.random.uniform(low=-1, high=1, size=(784, hid_nodes)) 
@@ -93,17 +97,17 @@ class Spatial_Coev_GA():
                 counter += num
             self.NNs[ind]["parasite_X_train"] = X_train[indices]
             self.NNs[ind]["parasite_y_train"] = y_train[indices]
-            self.NNs[ind]["parasite_score"] = 0
 
-    ############## 3.Run Spatial coevolution ##############
-    # 3.1 calculate fitness for host
-    def host_score (self, X_train, y_train, X_val, y_val):
+    ############## 2.Run Spatial coevolution ##############
+    # 2.1 calculate fitness for host
+    def fitness (self, X_train, y_train, X_val, y_val, population):
         """
         Calculate max score for each generation. Store max score in the array.
         Also calculate confusion matrix.
         """
         train_score = []
         val_score = []
+        parasite_score = []
         cf_matrix = []
 
         for ind in self.NNs:
@@ -114,44 +118,112 @@ class Spatial_Coev_GA():
             # calculate validation score
             current_mlp["val_score"]= current_mlp["model"].score(X_val, y_val)
 
-            train_score.append(self.NNs[ind]["train_score"])
-            val_score.append(self.NNs[ind]["val_score"])
+            train_score.append(current_mlp["train_score"])
+            val_score.append(current_mlp["val_score"])
+            
 
             ## output confusion matrix
-            y_train_pred = self.NNs[ind]["model"].predict(current_mlp["parasite_X_train"])
+            y_train_pred = current_mlp["model"].predict(current_mlp["parasite_X_train"])
             cf_matrix.append(confusion_matrix(current_mlp["parasite_y_train"], y_train_pred))
 
-            # compare y_train_pred to title
+            ### compute parasite score ###
+            true_result = current_mlp["parasite_y_train"] == y_train_pred
+            current_mlp["parasite_score"]  = 1 - (sum(true_result) / population)
+
+            parasite_score.append(current_mlp["parasite_score"])
 
         self.NNs_copy = deepcopy(self.NNs) # copy original including the scores
         print("Max training score: ", np.amax(train_score))
         print("Max validation score: ", np.amax(val_score))
+        print("Max parasite score: ", np.amax(parasite_score))
         self.all_train_score.append(np.amax(train_score))
         self.all_val_score.append(np.amax(val_score))
+        self.all_parasite_score.append(np.amax(parasite_score))
 
         return val_score, cf_matrix
 
-    # 3.2 calculate fitness for parasite 
-    def parasite_score(self):
+    # 2.2 select the best performing individuals
+    def selection(self, i, j, dim, neigh_size, rou_switch, host_or_parasite): 
+        score = self.NNs_copy[i * dim + j][host_or_parasite]
+        idx = i * dim + j
+        llim = - int(neigh_size / 2)
+        rlim = int(neigh_size / 2)
+
+        indices_lst = []
+        sum_fit = 0
+        fit_lst = []
+        
+        for k in range(llim,rlim+1):
+            for l in range(llim,rlim+1):
+                ### roulette wheel selection ###
+                if rou_switch:
+                    fit_lst.append(self.NNs_copy[((i + k) % dim) * dim + (j + l) % dim][host_or_parasite])
+                    indices_lst.append(((i + k) % dim) * dim + (j + l) % dim)
+                ### deterministic replacement###
+                else:
+                    if score < self.NNs_copy[((i + k) % dim) * dim + (j + l) % dim][host_or_parasite]:
+                        score = self.NNs_copy[((i + k) % dim) * dim + (j + l) % dim][host_or_parasite]
+                        idx = ((i + k) % dim) * dim + (j + l) % dim
+        ### roulette wheel selection ###
+        if rou_switch:
+            sum_fit = sum(fit_lst)
+            idx = np.random.choice(indices_lst, 1, p = fit_lst / sum_fit)[0] # returns index as nd array
+        return idx
+
+    # 2.3 mutation both host and parasite
+    def mutation_host(self, idx, mut_rate=0.5):
+        """
+        In each layer, mutate weights at random cites with probability "mut_rate"
+        ---
+        idx: int
+
+        """
+        for i in range(2):
+            # randomly select mutation sites
+            coef_size = self.NNs[idx]["model"].coefs_[i].size
+            shape = self.NNs[idx]["model"].coefs_[i].shape
+            mutation_sites = np.random.choice(coef_size, size=int(mut_rate * coef_size))\
+
+            # mutate values
+            for loci in mutation_sites:
+                self.NNs[idx]["model"].coefs_[i].flat[loci] += np.random.normal(loc=0.005)
+            self.NNs[idx]["model"].coefs_[i].reshape(shape)
+        return None
+    
+    def mutation_parasite(self, idx, mut_rate=0.5):
+        for image in self.NNs[idx]["parasite_X_train"]:
+            # randomly select mutation sites
+            shape = image.shape[0]
+            mutation_sites = np.random.choice(shape, size=int(mut_rate * shape))
+
+            # mutate values
+            for loci in mutation_sites:
+                image[loci] += np.random.normal(loc=50)
         return None
 
-    # 3.3 select the best performing two individuals
-    def host_selection(self):
-        return None
+    # 2.4 combine methods to coevolve the population
+    def coevolution(self, dim, neigh_size, rou_switch):
+        """
+        - Check every cell and apply probabilistic replacement and mutation
+        - Mutation happens for each layer
+        """
+        for i in range(dim): # for every row
+            for j in range(dim): #for every column
+                idx = i * dim + j # convert row and column notations to an index 
 
-    # 3.3 select the best performing parasites
-    def parasite_selection(self):
-        return None
+                # host neural network: probe max neighbor
+                host_new_idx = self.selection(i, j, dim, neigh_size, rou_switch, "train_score")
+                self.NNs[idx]["model"] = deepcopy(self.NNs_copy[host_new_idx]["model"])
 
-    # 3.4 mutate host neural networks
-    def host_mutation(self):
-        return None
+                # parasite MNIST data: probe max neighbor
+                parasite_new_idx = self.selection(i, j, dim, neigh_size, rou_switch, "parasite_score")
+                self.NNs[idx]["parasite_X_train"] = deepcopy(self.NNs_copy[parasite_new_idx]["parasite_X_train"])
+                self.NNs[idx]["parasite_y_train"] = deepcopy(self.NNs_copy[parasite_new_idx]["parasite_y_train"])
 
-    # 3.4 mutate parasite MNIST digits
-    def parasite_mutation(self):
-        return None
+                self.mutation_host(idx)
+                self.mutation_parasite(idx)
 
-    # 3.5 meausre dynamics
+    ############## 3.Measure phenotype, genotype and store result ##############
     def entropy_calculator(self, cf_matrix):
         """
         Compute KL-divergence (distance between metrices) to characterize phenotype
@@ -219,25 +291,16 @@ def run():
 
     ######### 3.Initialize Population(host, and parasite) #########
     model = Spatial_Coev_GA(hid_nodes)
-
     model.birth(population, hid_nodes, X_train, y_train)
     
     ######### 4. Run Non-spatial *CoEvolution #########
     for i in range(generations):
         print("\ncurrent generation: ", i)
-        val_score, cf_matrix = model.host_score(X_train, y_train, X_val, y_val)
-        print("hault")
-        model.parasite_score()
-
-        model.host_selection(X_train, y_train, X_val, y_val)
-        model.parasite_selection()
-
-        model.host_mutation()
-        model.parasite_mutation(population, cv_switch, selection_percent)
+        val_score, cf_matrix = model.fitness(X_train, y_train, X_val, y_val, population)
+        model.coevolution(dimension, neighbor_size, rou_switch)
         
-        model.entropy_calculator()
+        model.entropy_calculator(cf_matrix)
         model.cosine_sim()
-
     model.store_result([generations, 
                       population, 
                       hid_nodes])
