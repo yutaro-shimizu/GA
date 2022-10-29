@@ -277,8 +277,8 @@ class Spatial_Coev_GA():
         "rel_ent":self.entropy,
         "hyp_params":hyp_params}
         df = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in d.items() ]))
-        df.to_csv(f"./results/result_nonspatial_coev{now}.csv")
-        print(f"result stored as: result_nonspatial_coev{now}.csv")
+        df.to_csv(f"./results/result_spatial_coev{now}.csv")
+        print(f"result stored as: result_spatial_coev{now}.csv")
         return None
 
 def run():
