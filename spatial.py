@@ -21,7 +21,7 @@ warnings.filterwarnings('ignore')
 
 def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
     # load data
-    print("load data")
+    print("\nload data")
 
     data_train = pd.read_csv(train_csv) # load MNIST training data in
     data_train = np.array(data_train)   # turn into array
@@ -168,7 +168,7 @@ class Spatial_GA:
             idx = np.random.choice(indices_lst, 1, p = fit_lst / sum_fit)[0] # returns index as nd array
         return idx
 
-    def mutate(self, idx, mut_rate=0.5):
+    def mutate(self, idx, host_mut_rate=0.5, host_mut_amount=0.005):
         """
         In each layer, mutate weights at random cites with probability "mut_rate"
         ---
@@ -178,13 +178,13 @@ class Spatial_GA:
         for i in range(2):
             coef_size = self.NNs[idx]["model"].coefs_[i].size
             shape = self.NNs[idx]["model"].coefs_[i].shape
-            mutate_idx = np.random.choice(coef_size, size=int(mut_rate * coef_size))
+            mutate_idx = np.random.choice(coef_size, size=int(host_mut_rate * coef_size))
             for loci in mutate_idx:
-                self.NNs[idx]["model"].coefs_[i].flat[loci] += np.random.normal(loc=0.005)
+                self.NNs[idx]["model"].coefs_[i].flat[loci] += np.random.normal(loc=host_mut_amount)
             self.NNs[idx]["model"].coefs_[i].reshape(shape)
         return None
     
-    def probe_neighbors(self, dim, neigh_size, rou_switch):
+    def probe_neighbors(self, dim, neigh_size, rou_switch, host_mut_rate, host_mut_amount):
         """
         - Check every cell and apply probabilistic replacement and mutation
         - Mutation happens for each layer
@@ -193,7 +193,7 @@ class Spatial_GA:
             for j in range(dim): #for every column
                 idx = i*dim+j # convert row and column notations to an index 
                 self.NNs[idx] = deepcopy(self.NNs_copy[self.identify_max_neighbor(i, j, dim, neigh_size, rou_switch)])
-                self.mutate(idx)
+                self.mutate(idx, host_mut_rate, host_mut_amount)
 
     def cosine_sim(self):
         current_div = []
@@ -213,15 +213,18 @@ class Spatial_GA:
 def run():
 
     ######### 1.Set Hyperparameters #########
-    generations = int(sys.argv[1]) #10
-    dimension = int(sys.argv[2]) #10
-    rou_switch = int(sys.argv[3])
+    generations = int(input("Enter generations: ")) #10
+    dimension = int(input("Enter dimension: ")) #10
+    rou_switch = bool(input("Enter roulette_switch (True/False): "))
     population = dimension ** 2
     hid_nodes = 10 #int(sys.argv[4]) #10
-    mut_rate = 0.5 #float(sys.argv[5]) #0.05
     neighbor_size = 3
-    print("generations: ", generations)
-    print("population: ", population)
+    host_mut_rate = float(input("FOR HOST Enter mutation RATE (default 0.5): "))
+    host_mut_amount = float(input("FOR HOST Enter mutation AMOUNT (default 0.005): "))
+    print("\nGenerations: ", generations)
+    print("Population: ", population)
+    print("Roulette Selection: ", rou_switch)
+    print("Host mutation rate: ", host_mut_rate, "\nHost mutation amount: ", host_mut_amount)
         
     ######### 2.Load Data #########
     X_train, X_val, X_test, y_train, y_val, y_test = load_data()
@@ -238,16 +241,18 @@ def run():
         # ######### Plot growth per 10 iterations #########
         # if i%10 == 0:
         #     spaceGA.plot_growth(val_score, dimension, i)
-        spaceGA.probe_neighbors(dimension, neighbor_size, rou_switch)
+        spaceGA.probe_neighbors(dimension, neighbor_size, rou_switch, host_mut_rate, host_mut_amount)
         spaceGA.cosine_sim()
 
     ######### 5.Store Result #########
-    spaceGA.store_result([generations,
+    spaceGA.store_result([generations, 
                         dimension,
+                        rou_switch,
                         population,
                         hid_nodes,
-                        mut_rate,
-                        neighbor_size])
+                        neighbor_size,
+                        host_mut_rate,
+                        host_mut_amount])
     return None
 
 if __name__ == "__main__":

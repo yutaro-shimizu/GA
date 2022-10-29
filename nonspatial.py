@@ -20,7 +20,7 @@ warnings.filterwarnings('ignore')
 
 def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
     # load data
-    print("load data")
+    print("\nload data")
 
     data_train = pd.read_csv(train_csv) # load MNIST training data in
     data_train = np.array(data_train)   # turn into array
@@ -138,15 +138,15 @@ class NonSpatial_GA:
       child_coefs = np.ravel(prt1)
     return child_coefs, prt1.shape
   
-  def mutation(self, child_coefs,mut_rate=0.5):
+  def mutation(self, child_coefs, host_mut_rate=0.5, host_mut_amount=0.005):
     # mutation
     # randomly chose loci for mutation
     """
     check child_coefs.size and prt1.size
     """
-    mutate_idx = np.random.choice(child_coefs.size, int(mut_rate*child_coefs.size))
+    mutate_idx = np.random.choice(child_coefs.size, int(host_mut_rate*child_coefs.size))
     for idx in mutate_idx:
-      child_coefs[idx] += np.random.normal(loc=0.005)
+      child_coefs[idx] += np.random.normal(loc=host_mut_amount)
     return child_coefs
 
   def inject_weights(self,children):
@@ -157,7 +157,7 @@ class NonSpatial_GA:
 
     self.NNs, self.NNs_copy = deepcopy(self.NNs_copy), deepcopy(self.NNs) # overwrite the origial copy
     
-  def evolution(self, population, cv_switch, selection_percent, mut_rate=0.05):
+  def evolution(self, population, cv_switch, selection_percent, host_mut_rate, host_mut_amount):
     num_selected = int(population * selection_percent)
     
     children = [[] for i in range(population)] # sublist for each child
@@ -165,7 +165,7 @@ class NonSpatial_GA:
       child = []
       for j in range(2): # cross over for each layer (input and hidden)
         child_coefs, shape = self.crossover(num_selected, j, cv_switch)
-        child_coefs = self.mutation(child_coefs)
+        child_coefs = self.mutation(child_coefs, host_mut_rate, host_mut_amount)
 
         child.append(child_coefs.reshape(shape)) # child of weights and biases
       children[i] = child # put child in the population of children
@@ -199,14 +199,16 @@ class NonSpatial_GA:
 
 def run():
   ############## 1. import hyperparameters ##############
-  # input hyperparameters from the shell script
-  generations = int(sys.argv[1]) #10
-  population = int(sys.argv[2]) #10
-  hid_nodes = 10 #pint(sys.argv[3]) #10
+  generations = int(input("Enter generations: ")) #10
+  population = int(input("Enter population: "))
+  hid_nodes = 10 #int(sys.argv[4]) #10
   selection_percent = 0.2 #int(sys.argv[4]) #20
-  cv_switch = False #bool(sys.argv[5])
-  print("generations: ", generations)
-  print("population: ", population)
+  cv_switch = bool(input("Enter crossover switch (True/False): "))
+  host_mut_rate = float(input("FOR HOST Enter mutation RATE (default 0.5): "))
+  host_mut_amount = float(input("FOR HOST Enter mutation AMOUNT (default 0.005): "))
+  print("\nGenerations: ", generations)
+  print("Population: ", population)
+  print("Host mutation rate: ", host_mut_rate, "\nHost mutation amount: ", host_mut_amount)
 
   ############## 2. Load Data ##############
   X_train, X_val, X_test, y_train, y_val, y_test = load_data()
@@ -221,13 +223,15 @@ def run():
     val_score, cf_matrix = model.score_calculator(X_train, y_train, X_val, y_val)
     model.entropy_calculator(cf_matrix)
     model.selection()
-    model.evolution(population, cv_switch, selection_percent)
+    model.evolution(population, cv_switch, selection_percent, host_mut_rate, host_mut_amount)
     model.cosine_sim()
   model.store_result([generations, 
-                      population, 
-                      hid_nodes, 
+                      population,
+                      hid_nodes,
                       selection_percent,
-                      cv_switch])
+                      cv_switch,
+                      host_mut_rate,
+                      host_mut_amount])
   return None
 
 if __name__ == "__main__":
