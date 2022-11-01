@@ -291,7 +291,7 @@ def run():
     host_mut_rate = float(input("FOR HOST Enter mutation RATE (default 0.5): "))
     host_mut_amount = float(input("FOR HOST Enter mutation AMOUNT (default 0.005): "))
     parasite_mut_rate = float(input("FOR PARASITE Enter mutation RATE: "))
-    parasite_mut_amount = int(input("FOR PARASITE Enter mutation AMOUNT: "))
+    parasite_mut_amount = float(input("FOR PARASITE Enter mutation AMOUNT: "))
     neighbor_size = 3
     print("\nGenerations: ", generations)
     print("Population: ", population)
