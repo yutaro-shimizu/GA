@@ -53,6 +53,7 @@ class NonSpatial_GA:
         self.cos_sim = []
         self.entropy = []
 
+  ############## 1. Initialize host algorithm ##############
   def birth(self, population, hid_nodes, X_train, y_train):
       """
       Produce population each individual containing model, training score and validation score attributes.
@@ -72,7 +73,9 @@ class NonSpatial_GA:
           self.NNs[ind]["model"].coefs_[0] = np.random.random(size=(784, hid_nodes)) * np.sqrt(2/(784+10))/100
           self.NNs[ind]["model"].coefs_[1] = np.random.random(size=(hid_nodes, 10)) * np.sqrt(2/(784+10))/100
 
-  def score_calculator(self, X_train, y_train, X_val, y_val):
+  ############## 2.Run Non-spatial evolution ##############
+  # 2.1 calculate fitness for host algorithm
+  def fitness(self, X_train, y_train, X_val, y_val):
       """
       Calculate max score for each generation. Store max score in the array.
       """
@@ -97,31 +100,14 @@ class NonSpatial_GA:
 
       return val_score, cf_matrix
   
-  def entropy_calculator(self, cf_matrix):
-        """
-        Compute KL-divergence (distance between metrices) to characterize phenotype
-        normalize each row of the confusion matrix for KL-Divergence calculation
-        """
-        entropy_periter = []
-
-        for i in range(len(cf_matrix)):
-            for j in range(len(cf_matrix) - 1):
-                for row in range(10):
-                    # add 1e-4 to avoid overflow (division by 0 for log)
-                    entropy_periter.append(kl_div(normalize(1e-4+cf_matrix[i], axis=1, norm='l1')[row],
-                                                normalize(1e-4+cf_matrix[j+1], axis=1, norm='l1')[row]))
-
-
-        mean_KL = np.average(entropy_periter)
-        self.entropy.append(mean_KL)
-        print("KL-Divergence: ", mean_KL)
-        return None
-
+  # 2.2 select the best performing individuals
   def selection(self):
     self.NNs = dict(sorted(self.NNs.items(), key = lambda NNs:(NNs[1]["train_score"], NNs[0]), reverse=True)) # sort the list for selection
     self.NNs = {i: v for i, v in enumerate(self.NNs.values())}  
     self.NNs_copy = deepcopy(self.NNs) # clone the population
 
+  # 2.3 evolutionary mechanisms
+  # crossover is turned off for controlled-intervention
   def crossover(self, num_selected, j, cv_switch, mut_rate=0.05):
     # # random selection of parents from top 20%
     prt1_idx = random.randint(0,num_selected - 1) 
@@ -157,6 +143,7 @@ class NonSpatial_GA:
 
     self.NNs, self.NNs_copy = deepcopy(self.NNs_copy), deepcopy(self.NNs) # overwrite the origial copy
     
+  # 2.4 combine methods for evolution
   def evolution(self, population, cv_switch, selection_percent, host_mut_rate, host_mut_amount):
     num_selected = int(population * selection_percent)
     
@@ -170,6 +157,27 @@ class NonSpatial_GA:
         child.append(child_coefs.reshape(shape)) # child of weights and biases
       children[i] = child # put child in the population of children
     self.inject_weights(children)
+
+  ############## 3.Measure phenotype, genotype and store result ##############
+  def entropy_calculator(self, cf_matrix):
+        """
+        Compute KL-divergence (distance between metrices) to characterize phenotype
+        normalize each row of the confusion matrix for KL-Divergence calculation
+        """
+        entropy_periter = []
+
+        for i in range(len(cf_matrix)):
+            for j in range(len(cf_matrix) - 1):
+                for row in range(10):
+                    # add 1e-4 to avoid overflow (division by 0 for log)
+                    entropy_periter.append(kl_div(normalize(1e-4+cf_matrix[i], axis=1, norm='l1')[row],
+                                                normalize(1e-4+cf_matrix[j+1], axis=1, norm='l1')[row]))
+
+
+        mean_KL = np.average(entropy_periter)
+        self.entropy.append(mean_KL)
+        print("KL-Divergence: ", mean_KL)
+        return None
 
   def cosine_sim(self):
     current_div = []
@@ -220,7 +228,7 @@ def run():
   ######### 4.Run Non-spatial Evolution #########
   for i in range(generations):
     print("\ncurrent generation: ", i)
-    val_score, cf_matrix = model.score_calculator(X_train, y_train, X_val, y_val)
+    val_score, cf_matrix = model.fitness(X_train, y_train, X_val, y_val)
     model.entropy_calculator(cf_matrix)
     model.selection()
     model.evolution(population, cv_switch, selection_percent, host_mut_rate, host_mut_amount)
@@ -236,29 +244,3 @@ def run():
 
 if __name__ == "__main__":
     run() 
-
-"""
-# def plot(self):
-  #   COLOUR = 'white'
-  #   plt.rcParams['text.color'] = COLOUR
-  #   plt.rcParams['axes.labelcolor'] = COLOUR
-  #   plt.rcParams['axes.edgecolor'] = COLOUR
-  #   plt.rcParams['axes.facecolor'] = 'black'
-  #   plt.rcParams['xtick.color'] = COLOUR
-  #   plt.rcParams['ytick.color'] = COLOUR
-
-  #   plt.figure(facecolor="black")
-  #   plt.plot(self.all_train_score, label = "training")
-  #   plt.plot(self.all_val_score, label = "validation")
-  #   plt.legend()
-  #   plt.xlabel("Generations")
-  #   plt.ylabel("Max accuracy")
-  #   plt.legend()
-  #   plt.savefig('./Figures/nonspatial_final.png', transparent=True)
-
-  #   plt.figure(facecolor="black")
-  #   plt.plot(self.diversity)
-  #   plt.xlabel("Generations")
-  #   plt.ylabel("Cosine Similarity")
-  #   plt.savefig('./Figures/nonspatial_diversity.png', transparent=True)
-  """

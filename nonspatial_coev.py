@@ -1,3 +1,4 @@
+from cProfile import label
 from re import A
 from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import confusion_matrix
@@ -59,16 +60,15 @@ class NonSpatial_Coev_GA:
     def birth(self, population, hid_nodes, X_train, y_train):
         """
         Produce host and parasite. 
-        The pair is pacakged into each dictionary containing:
+        The pair is pacakged into a dictionary containing the following attributes:
             - MLPClassifier model
             - training score 
-            - validation score attributes
+            - validation score 
 
             and
             - parasites (10 digits from each class)
         """
         for ind in range(population):
-            ### 1.1 populate host (Neural Network Classifiers) ###
             self.NNs[ind] = {"model": MLPClassifier(hidden_layer_sizes=(hid_nodes,), 
                                                     max_iter=1, 
                                                     alpha=1e-4,
@@ -76,7 +76,12 @@ class NonSpatial_Coev_GA:
                                                     verbose=False, 
                                                     learning_rate_init=.1),
                             "train_score": 0,
-                            "val_score": 0}
+                            "val_score": 0,
+                            "parasite_X_train": None,
+                            "parasite_y_train": None,
+                            "parasite_score": 0}
+
+            ### 1.1 populate host (Neural Network Classifiers) ###
             self.NNs[ind]["model"].fit(X_train, y_train) # fit the network to initialize W and b
             # randomly initialize weights and biases
             self.NNs[ind]["model"].coefs_[0] = np.random.uniform(low=-1, high=1, size=(784, hid_nodes)) 
@@ -91,59 +96,91 @@ class NonSpatial_Coev_GA:
                 counter += num
             self.NNs[ind]["parasite_X_train"] = X_train[indices]
             self.NNs[ind]["parasite_y_train"] = y_train[indices]
-            self.NNs[ind]["parasite_score"] = 0
 
-    ############## 4.Run Non-spatial coevolution ##############
-    # 4.1 calculate fitness for host
-    def host_score (self, X_train, y_train, X_val, y_val):
+    ############## 2.Run Non-spatial coevolution ##############
+    # 2.1 calculate fitness for host
+    def fitness (self, X_train, y_train, X_val, y_val, population):
         """
         Calculate max score for each generation. Store max score in the array.
         Also calculate confusion matrix.
         """
         train_score = []
         val_score = []
+        parasite_score = []
         cf_matrix = []
 
         for ind in self.NNs:
-            self.NNs[ind]["train_score"]= self.NNs[ind]["model"].score(X_train, y_train) # calculate the score
-            self.NNs[ind]["val_score"]= self.NNs[ind]["model"].score(X_val, y_val)
-            train_score.append(self.NNs[ind]["train_score"])
-            val_score.append(self.NNs[ind]["val_score"])
+            current_mlp = self.NNs[ind]
+            # calculate training score
+            current_mlp["train_score"]= current_mlp["model"].score(current_mlp["parasite_X_train"], 
+                                                                   current_mlp["parasite_y_train"]) 
+            # calculate validation score
+            current_mlp["val_score"]= current_mlp["model"].score(X_val, y_val)
 
-            ## output confusion matrix and compute relative entropy
-            y_val_pred = self.NNs[ind]["model"].predict(X_val)
-            cf_matrix.append(confusion_matrix(y_val,y_val_pred))
+            train_score.append(current_mlp["train_score"])
+            val_score.append(current_mlp["val_score"])
+            
+
+            ## output confusion matrix
+            y_train_pred = current_mlp["model"].predict(current_mlp["parasite_X_train"])
+            cf_matrix.append(confusion_matrix(current_mlp["parasite_y_train"], y_train_pred))
+
+            ### compute parasite score ###
+            true_result = current_mlp["parasite_y_train"] == y_train_pred
+            current_mlp["parasite_score"]  = 1 - (sum(true_result) / population)
+
+            parasite_score.append(current_mlp["parasite_score"])
 
         self.NNs_copy = deepcopy(self.NNs) # copy original including the scores
         print("Max training score: ", np.amax(train_score))
         print("Max validation score: ", np.amax(val_score))
+        print("Max parasite score: ", np.amax(parasite_score))
         self.all_train_score.append(np.amax(train_score))
         self.all_val_score.append(np.amax(val_score))
+        self.all_parasite_score.append(np.amax(parasite_score))
 
         return val_score, cf_matrix
 
-# 4.1 calculate fitness for parasite 
-    def parasite_score(self):
-        return None
-    # how do i calculate the score for parasites?
-
-# 4.2 select the best performing two individuals
-    def host_selection(self):
+    # 2.2 select the best performing parasites
+    def selection(self):
         return None
 
-# 4.2 select the best performing parasites
-    def parasite_selection(self):
+    # 2.3 mutation both host and parasite
+    def mutation_host(self, idx, mut_rate=0.5, mut_amount=0.005):
+        """
+        In each layer, mutate weights at random cites with probability "mut_rate"
+        ---
+        idx: int
+
+        """
+        for i in range(2):
+            # randomly select mutation sites
+            coef_size = self.NNs[idx]["model"].coefs_[i].size
+            shape = self.NNs[idx]["model"].coefs_[i].shape
+            mutation_sites = np.random.choice(coef_size, size=int(mut_rate * coef_size))\
+
+            # mutate values
+            for loci in mutation_sites:
+                self.NNs[idx]["model"].coefs_[i].flat[loci] += np.random.normal(loc=mut_amount)
+            self.NNs[idx]["model"].coefs_[i].reshape(shape)
+        return None
+    
+    def mutation_parasite(self, idx, mut_rate=0.5, mut_amount=10):
+        for image in self.NNs[idx]["parasite_X_train"]:
+            # randomly select mutation sites
+            shape = image.shape[0]
+            mutation_sites = np.random.choice(shape, size=int(mut_rate * shape))
+
+            # mutate values
+            for loci in mutation_sites:
+                image[loci] += np.random.normal(loc=mut_amount)
         return None
 
-# 4.3 mutate host neural networks
-    def host_mutation(self):
+    # 2.4 combine methods to coevolve the population
+    def coevolution(self):
         return None
 
-# 4.3 mutate parasite MNIST digits
-    def parasite_mutation(self):
-        return None
-
-# 4.4  measure dynamics
+    ############## 3.Measure phenotype, genotype and store result ##############
     def entropy_calculator(self, cf_matrix):
         """
         Compute KL-divergence (distance between metrices) to characterize phenotype
@@ -196,15 +233,18 @@ class NonSpatial_Coev_GA:
 
 def run():
     ######### 1.Set Hyperparameters #########
-    generations = int(sys.argv[1]) #10
-    dimension = int(sys.argv[2]) #10
-    rou_switch = int(sys.argv[3])
-    population = dimension ** 2
+    generations = int(input("Enter generations: ")) #10
+    population = int(input("Enter dimension: ")) #10
+    rou_switch = 0 #int(sys.argv[3])
     hid_nodes = 10 #int(sys.argv[4]) #10
-    mut_rate = 0.5 #float(sys.argv[5]) #0.05
-    neighbor_size = 3
-    print("generations: ", generations)
-    print("population: ", population)
+    host_mut_rate = float(input("FOR HOST Enter mutation RATE (default 0.5): "))
+    host_mut_amount = float(input("FOR HOST Enter mutation AMOUNT (default 0.005): "))
+    parasite_mut_rate = float(input("FOR PARASITE Enter mutation RATE: "))
+    parasite_mut_amount = float(input("FOR PARASITE Enter mutation AMOUNT: "))
+    print("\nGenerations: ", generations)
+    print("Population: ", population)
+    print("Host mutation rate: ", host_mut_rate, "\nHost mutation amount: ", host_mut_amount)
+    print("Parasite mutation rate: ", parasite_mut_rate, "\nParasite mutation amount: ", parasite_mut_amount)
         
     ######### 2.Load Data #########
     X_train, X_val, X_test, y_train, y_val, y_test = load_data()
