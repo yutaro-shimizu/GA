@@ -4,9 +4,9 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn.preprocessing import normalize
 from scipy.special import kl_div
+from scipy.special import softmax
 from scipy.misc import face
 from scipy.spatial import distance
-from scipy.stats import entropy
 from copy import deepcopy
 
 import numpy as np
@@ -18,6 +18,22 @@ from datetime import datetime
 import sys
 import warnings
 warnings.filterwarnings('ignore')
+
+def hyps():
+    generations = int(input("Enter generations: ")) #10
+    population = int(input("Enter dimension: ")) #10
+    rou_switch = 0 #int(sys.argv[3])
+    hid_nodes = 10 #int(sys.argv[4]) #10
+    host_mut_rate = float(input("FOR HOST Enter mutation RATE (default 0.5): "))
+    host_mut_amount = float(input("FOR HOST Enter mutation AMOUNT (default 0.005): "))
+    parasite_mut_rate = float(input("FOR PARASITE Enter mutation RATE: "))
+    parasite_mut_amount = float(input("FOR PARASITE Enter mutation AMOUNT: "))
+    print("\nGenerations: ", generations)
+    print("Population: ", population)
+    print("Host mutation rate: ", host_mut_rate, "\nHost mutation amount: ", host_mut_amount)
+    print("Parasite mutation rate: ", parasite_mut_rate, "\nParasite mutation amount: ", parasite_mut_amount)
+    
+    return generations, population, rou_switch, hid_nodes, host_mut_rate, host_mut_amount, parasite_mut_rate, parasite_mut_amount
 
 def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
     # load data
@@ -49,9 +65,9 @@ class NonSpatial_Coev_GA:
     def __init__(self, hid_nodes):
         self.NNs = {} # set of models for evolution. Swaps based on training score during evolution. 
         self.NNs_copy = {}  # for reference during evolution. Does not change during swaps.
-        self.mnist_score = [] # track parasite score
         self.all_train_score = []
         self.all_val_score = []
+        self.all_parasite_score = []
         self.neighbors = []
         self.cos_sim = []
         self.entropy = []
@@ -131,19 +147,30 @@ class NonSpatial_Coev_GA:
 
             parasite_score.append(current_mlp["parasite_score"])
 
-        self.NNs_copy = deepcopy(self.NNs) # copy original including the scores
+        self.NNs_copy = deepcopy(self.NNs) # clone the population
         print("Max training score: ", np.amax(train_score))
         print("Max validation score: ", np.amax(val_score))
         print("Max parasite score: ", np.amax(parasite_score))
         self.all_train_score.append(np.amax(train_score))
         self.all_val_score.append(np.amax(val_score))
         self.all_parasite_score.append(np.amax(parasite_score))
-
+        
         return val_score, cf_matrix
 
-    # 2.2 select the best performing parasites
-    def selection(self):
-        return None
+    # 2.2 select the best performing hot and parasite
+    def selection(self, host_par_score, host_par_model, population):
+        # make an array w prob. distribution
+        all_scores = []
+        # extract score from the model
+        for ind in self.NNs:
+            all_scores.append(self.NNs[ind][host_par_score])
+        all_probs = softmax(all_scores)
+
+        # loop through each cell and chose the new one
+        for idx in self.NNs:
+            new_idx = np.random.choice(a=population, size=1, p=all_probs)[0]
+            for i in host_par_model:
+                self.NNs[idx][i] = deepcopy(self.NNs_copy[new_idx][i])
 
     # 2.3 mutation both host and parasite
     def mutation_host(self, idx, mut_rate=0.5, mut_amount=0.005):
@@ -157,7 +184,7 @@ class NonSpatial_Coev_GA:
             # randomly select mutation sites
             coef_size = self.NNs[idx]["model"].coefs_[i].size
             shape = self.NNs[idx]["model"].coefs_[i].shape
-            mutation_sites = np.random.choice(coef_size, size=int(mut_rate * coef_size))\
+            mutation_sites = np.random.choice(coef_size, size=int(mut_rate * coef_size))
 
             # mutate values
             for loci in mutation_sites:
@@ -177,7 +204,15 @@ class NonSpatial_Coev_GA:
         return None
 
     # 2.4 combine methods to coevolve the population
-    def coevolution(self):
+    def coevolution(self, population, host_mut_rate, host_mut_amount, parasite_mut_rate, parasite_mut_amount):
+        # selection/migration
+        self.selection("val_score", ["model"], population)
+        self.selection("parasite_score", ["parasite_X_train", "parasite_y_train"], population)
+
+        # mutation
+        for idx in range(population):
+            self.mutation_host(idx, host_mut_rate, host_mut_amount)
+            self.mutation_parasite(idx, parasite_mut_rate, parasite_mut_amount)
         return None
 
     ############## 3.Measure phenotype, genotype and store result ##############
@@ -222,7 +257,7 @@ class NonSpatial_Coev_GA:
 
         d = {"train_score":self.all_train_score,
         "val_score":self.all_val_score,
-        "mnist_score":self.mnist_score,
+        "parasite_score":self.all_parasite_score,
         "cos_sim":self.cos_sim,
         "rel_ent":self.entropy,
         "hyp_params":hyp_params}
@@ -233,53 +268,30 @@ class NonSpatial_Coev_GA:
 
 def run():
     ######### 1.Set Hyperparameters #########
-    generations = int(input("Enter generations: ")) #10
-    population = int(input("Enter dimension: ")) #10
-    rou_switch = 0 #int(sys.argv[3])
-    hid_nodes = 10 #int(sys.argv[4]) #10
-    host_mut_rate = float(input("FOR HOST Enter mutation RATE (default 0.5): "))
-    host_mut_amount = float(input("FOR HOST Enter mutation AMOUNT (default 0.005): "))
-    parasite_mut_rate = float(input("FOR PARASITE Enter mutation RATE: "))
-    parasite_mut_amount = float(input("FOR PARASITE Enter mutation AMOUNT: "))
-    print("\nGenerations: ", generations)
-    print("Population: ", population)
-    print("Host mutation rate: ", host_mut_rate, "\nHost mutation amount: ", host_mut_amount)
-    print("Parasite mutation rate: ", parasite_mut_rate, "\nParasite mutation amount: ", parasite_mut_amount)
-        
+    generations, population, rou_switch, hid_nodes, host_mut_rate, host_mut_amount, parasite_mut_rate, parasite_mut_amount = hyps()
     ######### 2.Load Data #########
     X_train, X_val, X_test, y_train, y_val, y_test = load_data()
 
     ######### 3.Initialize Population(host, and parasite) #########
     model = NonSpatial_Coev_GA(hid_nodes)
-
-    model.birth_host(population, hid_nodes, X_train, y_train)
-    model.birth_parasite()
+    model.birth(population, hid_nodes, X_train, y_train)
     
     ######### 4. Run Non-spatial ***Co-***Evolution #########
     for i in range(generations):
         print("\ncurrent generation: ", i)
-        val_score, cf_matrix = model.host_score(X_train, y_train, X_val, y_val)
-        model.parasite_score()
-
-        model.host_selection(X_train, y_train, X_val, y_val)
-        model.parasite_selection()
-
-        model.host_mutation()
-        model.parasite_mutation(population, cv_switch, selection_percent)
-        
-        model.entropy_calculator()
+        val_score, cf_matrix = model.fitness(X_train, y_train, X_val, y_val, population)
+        model.coevolution(population, host_mut_rate, host_mut_amount, parasite_mut_rate, parasite_mut_amount)
+        model.entropy_calculator(cf_matrix)
         model.cosine_sim()
 
     model.store_result([generations,
-                    dimension,
-                    rou_switch,
                     population,
+                    rou_switch,
                     hid_nodes,
                     host_mut_rate,
                     host_mut_amount,
                     parasite_mut_rate,
-                    parasite_mut_amount,
-                    neighbor_size])
+                    parasite_mut_amount])
     return None
 
 if __name__=="__main__":

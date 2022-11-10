@@ -55,6 +55,7 @@ class Spatial_GA:
         self.cos_sim = []
         self.entropy = []
 
+    ############## 1. Initialize host algorithm ##############
     def birth(self, population, hid_nodes, X_train, y_train):
         """
         Produce population each individual containing model, training score and validation score attributes.
@@ -69,7 +70,9 @@ class Spatial_GA:
             self.NNs[ind]["model"].coefs_[0] = np.random.uniform(low=-1, high=1, size=(784, hid_nodes)) 
             self.NNs[ind]["model"].coefs_[1] = np.random.uniform(low=-1, high=1, size=(hid_nodes, 10))
 
-    def score_calculator(self, X_train, y_train, X_val, y_val):
+    ############## 2.Run Non-spatial coevolution ##############
+    # 2.1 calculate fitness for host
+    def fitness(self, X_train, y_train, X_val, y_val):
         """
         Calculate max score for each generation. Store max score in the array.
         Also calculate confusion matrix.
@@ -96,51 +99,6 @@ class Spatial_GA:
 
         return val_score, cf_matrix
     
-    def entropy_calculator(self, cf_matrix):
-        """
-        Compute KL-divergence (distance between metrices) to characterize phenotype
-        normalize each row of the confusion matrix for KL-Divergence calculation
-        """
-        entropy_periter = []
-
-        for i in range(len(cf_matrix)):
-            for j in range(len(cf_matrix) - 1):
-                for row in range(10):
-                    # add 1e-4 to avoid overflow (division by 0 for log)
-                    entropy_periter.append(kl_div(normalize(1e-4+cf_matrix[i], axis=1, norm='l1')[row],
-                                                normalize(1e-4+cf_matrix[j+1], axis=1, norm='l1')[row]))
-
-
-        mean_KL = np.average(entropy_periter)
-        self.entropy.append(mean_KL)
-        print("KL-Divergence: ", mean_KL)
-
-    def plot_growth(self, val_score, dim, i):
-
-        COLOUR = 'white'
-        plt.rcParams['text.color'] = COLOUR
-        plt.rcParams['axes.labelcolor'] = COLOUR
-        plt.rcParams['xtick.color'] = COLOUR
-        plt.rcParams['ytick.color'] = COLOUR
-
-        plt.figure(facecolor="black")
-        im = plt.imshow(np.reshape((val_score),(dim,dim)),vmin=0.1,vmax=0.8)
-        plt.colorbar(im)
-        plt.savefig(f'./Figures/figure{i}.png', transparent=True)
-
-    def store_result(self, hyp_params):
-        now = datetime.now().strftime("%y%m%d%H%M%S")
-
-        d = {"train_score":self.all_train_score,
-        "val_score":self.all_val_score,
-        "cos_sim":self.cos_sim,
-        "rel_ent":self.entropy,
-        "hyp_params":hyp_params}
-        df = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in d.items() ]))
-
-        df.to_csv(f"./results/result_spatial{now}.csv")
-        print(f"result stored as: result_spatial{now}.csv")
-
     def identify_max_neighbor(self, i, j, dim, neigh_size, rou_switch): 
         score = self.NNs_copy[i * dim + j]["train_score"]
         idx = i * dim + j
@@ -194,6 +152,26 @@ class Spatial_GA:
                 idx = i*dim+j # convert row and column notations to an index 
                 self.NNs[idx] = deepcopy(self.NNs_copy[self.identify_max_neighbor(i, j, dim, neigh_size, rou_switch)])
                 self.mutate(idx, host_mut_rate, host_mut_amount)
+   
+    ############## 3.Measure phenotype, genotype and store result ##############
+    def entropy_calculator(self, cf_matrix):
+        """
+        Compute KL-divergence (distance between metrices) to characterize phenotype
+        normalize each row of the confusion matrix for KL-Divergence calculation
+        """
+        entropy_periter = []
+
+        for i in range(len(cf_matrix)):
+            for j in range(len(cf_matrix) - 1):
+                for row in range(10):
+                    # add 1e-4 to avoid overflow (division by 0 for log)
+                    entropy_periter.append(kl_div(normalize(1e-4+cf_matrix[i], axis=1, norm='l1')[row],
+                                                normalize(1e-4+cf_matrix[j+1], axis=1, norm='l1')[row]))
+
+
+        mean_KL = np.average(entropy_periter)
+        self.entropy.append(mean_KL)
+        print("KL-Divergence: ", mean_KL)
 
     def cosine_sim(self):
         current_div = []
@@ -209,6 +187,32 @@ class Spatial_GA:
         div_score = np.mean(current_div)
         self.cos_sim.append(div_score)
         print("Cosine Similarity: ", div_score,"\n")
+
+    def store_result(self, hyp_params):
+        now = datetime.now().strftime("%y%m%d%H%M%S")
+
+        d = {"train_score":self.all_train_score,
+        "val_score":self.all_val_score,
+        "cos_sim":self.cos_sim,
+        "rel_ent":self.entropy,
+        "hyp_params":hyp_params}
+        df = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in d.items() ]))
+
+        df.to_csv(f"./results/result_spatial{now}.csv")
+        print(f"result stored as: result_spatial{now}.csv")
+
+    def plot_growth(self, val_score, dim, i):
+
+        COLOUR = 'white'
+        plt.rcParams['text.color'] = COLOUR
+        plt.rcParams['axes.labelcolor'] = COLOUR
+        plt.rcParams['xtick.color'] = COLOUR
+        plt.rcParams['ytick.color'] = COLOUR
+
+        plt.figure(facecolor="black")
+        im = plt.imshow(np.reshape((val_score),(dim,dim)),vmin=0.1,vmax=0.8)
+        plt.colorbar(im)
+        plt.savefig(f'./Figures/figure{i}.png', transparent=True)
 
 def run():
 
@@ -236,11 +240,8 @@ def run():
     ######### 4.Run Spatial Evolution #########
     for i in range(generations):
         print("\ncurrent generation: ", i)
-        val_score, cf_matrix = spaceGA.score_calculator(X_train, y_train, X_val, y_val)
+        val_score, cf_matrix = spaceGA.fitness(X_train, y_train, X_val, y_val)
         spaceGA.entropy_calculator(cf_matrix)
-        # ######### Plot growth per 10 iterations #########
-        # if i%10 == 0:
-        #     spaceGA.plot_growth(val_score, dimension, i)
         spaceGA.probe_neighbors(dimension, neighbor_size, rou_switch, host_mut_rate, host_mut_amount)
         spaceGA.cosine_sim()
 
@@ -257,29 +258,3 @@ def run():
 
 if __name__ == "__main__":
     run()
-
-    """
-    # def plot_final(self):
-
-    #     COLOUR = 'white'
-    #     plt.rcParams['text.color'] = COLOUR
-    #     plt.rcParams['axes.labelcolor'] = COLOUR
-    #     plt.rcParams['axes.edgecolor'] = COLOUR
-    #     plt.rcParams['axes.facecolor'] = 'black'
-    #     plt.rcParams['xtick.color'] = COLOUR
-    #     plt.rcParams['ytick.color'] = COLOUR
-
-    #     plt.figure(facecolor="black")
-    #     plt.plot(self.all_train_score, label = "training")
-    #     plt.plot(self.all_val_score, label = "validation")
-    #     plt.xlabel("Generations")
-    #     plt.ylabel("Max Accuracy")
-    #     plt.legend()
-    #     plt.savefig('./Figures/saptial_final.png', transparent=True)
-
-    #     plt.figure(facecolor="black")
-    #     plt.plot(self.cos_sim)
-    #     plt.xlabel("Generations")
-    #     plt.ylabel("Cosine Similarity")
-    #     plt.savefig('./Figures/spatial_diversity.png', transparent=True)
-    """
