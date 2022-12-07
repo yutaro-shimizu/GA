@@ -216,6 +216,7 @@ def run():
   host_mut_amount = float(input("FOR HOST Enter mutation AMOUNT (default 0.005): "))
   print("\nGenerations: ", generations)
   print("Population: ", population)
+  print("Cross Over: ", cv_switch)
   print("Host mutation rate: ", host_mut_rate, "\nHost mutation amount: ", host_mut_amount)
 
   ############## 2. Load Data ##############

@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 
 import sys
+import os
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -267,9 +268,14 @@ class Spatial_Coev_GA():
         print("Cosine Similarity: ", div_score,"\n")
         return None
 
-    def store_result(self, hyp_params):
+    def init_path(self):
         now = datetime.now().strftime("%y%m%d%H%M%S")
+        path = f"./results/spatial_coev{now}"
+        os.mkdir(path)
 
+        return path
+
+    def store_result(self, hyp_params, path):
         d = {"train_score":self.all_train_score,
         "val_score":self.all_val_score,
         "mnist_score":self.all_parasite_score,
@@ -277,9 +283,19 @@ class Spatial_Coev_GA():
         "rel_ent":self.entropy,
         "hyp_params":hyp_params}
         df = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in d.items() ]))
-        df.to_csv(f"./results/result_spatial_coev{now}.csv")
-        print(f"result stored as: result_spatial_coev{now}.csv")
+        df.to_csv(path+"/result_spatial_coev.csv")
         return None
+
+    def mnist_visualizer(self, path, iter):
+        # plot images
+        fig, axes = plt.subplots(2, 5)
+        for i in range(10):
+            image = self.NNs[0]['parasite_X_train'][i]
+            label = self.NNs[0]['parasite_y_train'][i]
+            ax = axes[i//5, i%5]
+            ax.imshow(np.reshape(image,(28,28)), cmap='gray')
+            ax.set_title('Label: {}'.format(label))
+        plt.savefig(path+f"/spatial_coevo_{iter}.png")
 
 def run():
    ######### 1.Set Hyperparameters #########
@@ -292,6 +308,7 @@ def run():
     host_mut_amount = float(input("FOR HOST Enter mutation AMOUNT (default 0.005): "))
     parasite_mut_rate = float(input("FOR PARASITE Enter mutation RATE: "))
     parasite_mut_amount = float(input("FOR PARASITE Enter mutation AMOUNT: "))
+    visualize_per = int(input("Visualize every how many iterations?"))
     neighbor_size = 3
     print("\nGenerations: ", generations)
     print("Population: ", population)
@@ -320,9 +337,14 @@ def run():
                           host_mut_amount,
                           parasite_mut_rate,
                           parasite_mut_amount)
-        
         model.entropy_calculator(cf_matrix)
         model.cosine_sim()
+
+        if i == 0:
+            path = model.init_path()
+        if i % visualize_per == 0:
+            model.mnist_visualizer(path, i)
+
     model.store_result([generations,
                         dimension,
                         rou_switch,
@@ -332,7 +354,7 @@ def run():
                         host_mut_amount,
                         parasite_mut_rate,
                         parasite_mut_amount,
-                        neighbor_size])
+                        neighbor_size], path)
     return None
 
 if __name__ == "__main__":

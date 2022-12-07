@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 
 import sys
+import os
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -28,12 +29,15 @@ def hyps():
     host_mut_amount = float(input("FOR HOST Enter mutation AMOUNT (default 0.005): "))
     parasite_mut_rate = float(input("FOR PARASITE Enter mutation RATE: "))
     parasite_mut_amount = float(input("FOR PARASITE Enter mutation AMOUNT: "))
+    visualize = bool(input("Visualize MNIST: "))
+    if visualize:
+        visualize_per = int(input("Visualize every how many iterations?"))
     print("\nGenerations: ", generations)
     print("Population: ", population)
     print("Host mutation rate: ", host_mut_rate, "\nHost mutation amount: ", host_mut_amount)
     print("Parasite mutation rate: ", parasite_mut_rate, "\nParasite mutation amount: ", parasite_mut_amount)
     
-    return generations, population, rou_switch, hid_nodes, host_mut_rate, host_mut_amount, parasite_mut_rate, parasite_mut_amount
+    return generations, population, rou_switch, hid_nodes, host_mut_rate, host_mut_amount, parasite_mut_rate, parasite_mut_amount, visualize, visualize_per
 
 def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
     # load data
@@ -55,8 +59,8 @@ def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
     X_test = data_test[:, 1:q]  # rest of data
 
     #next two lines are taking 10,000 samples from MNIST
-    X_train, X_val = X_train[:10000], X_train[10000:20000]
-    y_train, y_val = Y_train[:10000], Y_train[10000:20000]
+    X_train, X_val = X_train[:50000], X_train[50000:60000]
+    y_train, y_val = Y_train[:50000], Y_train[50000:60000]
 
     print("load data complete")
     return X_train, X_val, X_test, y_train, y_val, y_test
@@ -107,8 +111,8 @@ class NonSpatial_Coev_GA:
             indices = []
             counter = 0
             for num in np.unique(y_train, return_counts = True)[1]:
-                # for each class of digit, randomly pick 10 images with replacement
-                indices.extend(np.random.randint(counter, counter + num, 10))
+                # for each class of digit, randomly pick 1000 images with replacement
+                indices.extend(np.random.randint(counter, counter + num, 1000))
                 counter += num
             self.NNs[ind]["parasite_X_train"] = X_train[indices]
             self.NNs[ind]["parasite_y_train"] = y_train[indices]
@@ -252,9 +256,15 @@ class NonSpatial_Coev_GA:
         print("Cosine Similarity: ", div_score,"\n")
         return None
 
-    def store_result(self, hyp_params):
+    def init_path(self):
         now = datetime.now().strftime("%y%m%d%H%M%S")
+        path = f"./results/spatial_coev{now}"
+        os.mkdir(path)
 
+        return path
+
+
+    def store_result(self, hyp_params, now, path):
         d = {"train_score":self.all_train_score,
         "val_score":self.all_val_score,
         "parasite_score":self.all_parasite_score,
@@ -262,13 +272,25 @@ class NonSpatial_Coev_GA:
         "rel_ent":self.entropy,
         "hyp_params":hyp_params}
         df = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in d.items() ]))
-        df.to_csv(f"./results/result_nonspatial_coev{now}.csv")
+        df.to_csv(path+f"/result_nonspatial_coev{now}.csv")
         print(f"result stored as: result_nonspatial_coev{now}.csv")
         return None
 
+    def mnist_visualizer(self, path, iter):
+        # plot images
+        fig, axes = plt.subplots(2, 5)
+        for i in range(10):
+            image = self.NNs[0]['parasite_X_train'][i]
+            label = self.NNs[0]['parasite_y_train'][i]
+            ax = axes[i//5, i%5]
+            ax.imshow(np.reshape(image,(28,28)), cmap='gray')
+            ax.set_title('Label: {}'.format(label))
+        plt.tight_layout()
+        plt.savefig(path+f"/spatial_coevo{iter}.png")
+
 def run():
     ######### 1.Set Hyperparameters #########
-    generations, population, rou_switch, hid_nodes, host_mut_rate, host_mut_amount, parasite_mut_rate, parasite_mut_amount = hyps()
+    generations, population, rou_switch, hid_nodes, host_mut_rate, host_mut_amount, parasite_mut_rate, parasite_mut_amount, visualize, visualize_per = hyps()
     ######### 2.Load Data #########
     X_train, X_val, X_test, y_train, y_val, y_test = load_data()
 
@@ -283,6 +305,11 @@ def run():
         model.coevolution(population, host_mut_rate, host_mut_amount, parasite_mut_rate, parasite_mut_amount)
         model.entropy_calculator(cf_matrix)
         model.cosine_sim()
+
+        if i == 0:
+            path = model.init_path()
+        if i % visualize_per == 0:
+            model.mnist_visualizer(path, i)
 
     model.store_result([generations,
                     population,
