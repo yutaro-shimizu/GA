@@ -22,7 +22,7 @@ warnings.filterwarnings('ignore')
 
 def hyps():
     generations = int(input("Enter generations: ")) #10
-    population = int(input("Enter dimension: ")) #10
+    population = int(input("Enter population: ")) #10
     rou_switch = 0 #int(sys.argv[3])
     hid_nodes = 10 #int(sys.argv[4]) #10
     host_mut_rate = float(input("FOR HOST Enter mutation RATE (default 0.5): "))
@@ -32,6 +32,8 @@ def hyps():
     visualize = bool(input("Visualize MNIST: "))
     if visualize:
         visualize_per = int(input("Visualize every how many iterations?"))
+    else:
+        visualize_per = 0
     print("\nGenerations: ", generations)
     print("Population: ", population)
     print("Host mutation rate: ", host_mut_rate, "\nHost mutation amount: ", host_mut_amount)
@@ -112,7 +114,7 @@ class NonSpatial_Coev_GA:
             counter = 0
             for num in np.unique(y_train, return_counts = True)[1]:
                 # for each class of digit, randomly pick 1000 images with replacement
-                indices.extend(np.random.randint(counter, counter + num, 1000))
+                indices.extend(np.random.randint(counter, counter + num, 100))
                 counter += num
             self.NNs[ind]["parasite_X_train"] = X_train[indices]
             self.NNs[ind]["parasite_y_train"] = y_train[indices]
@@ -228,11 +230,13 @@ class NonSpatial_Coev_GA:
         entropy_periter = []
 
         for i in range(len(cf_matrix)):
-            for j in range(len(cf_matrix) - 1):
+            for j in range(len(cf_matrix)):
+                if i >= j:
+                    continue
                 for row in range(10):
                     # add 1e-4 to avoid overflow (division by 0 for log)
                     entropy_periter.append(kl_div(normalize(1e-4+cf_matrix[i], axis=1, norm='l1')[row],
-                                                normalize(1e-4+cf_matrix[j+1], axis=1, norm='l1')[row]))
+                                                normalize(1e-4+cf_matrix[j], axis=1, norm='l1')[row]))
 
         mean_KL = np.average(entropy_periter)
         self.entropy.append(mean_KL)
@@ -262,7 +266,6 @@ class NonSpatial_Coev_GA:
         os.mkdir(path)
 
         return path
-
 
     def store_result(self, hyp_params, now, path):
         d = {"train_score":self.all_train_score,
@@ -303,13 +306,14 @@ def run():
         print("\ncurrent generation: ", i)
         val_score, cf_matrix = model.fitness(X_train, y_train, X_val, y_val, population)
         model.coevolution(population, host_mut_rate, host_mut_amount, parasite_mut_rate, parasite_mut_amount)
-        model.entropy_calculator(cf_matrix)
-        model.cosine_sim()
+        # model.entropy_calculator(cf_matrix)
+        # model.cosine_sim()
 
         if i == 0:
             path = model.init_path()
-        if i % visualize_per == 0:
-            model.mnist_visualizer(path, i)
+        if visualize:
+            if i % visualize_per == 0:
+                model.mnist_visualizer(path, i)
 
     model.store_result([generations,
                     population,

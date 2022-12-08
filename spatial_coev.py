@@ -41,8 +41,8 @@ def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
     X_test = data_test[:, 1:q]  # rest of data
 
     #next two lines are taking 10,000 samples from MNIST
-    X_train, X_val = X_train[:10000], X_train[10000:20000]
-    y_train, y_val = Y_train[:10000], Y_train[10000:20000]
+    X_train, X_val = X_train[:50000], X_train[50000:60000]
+    y_train, y_val = Y_train[:50000], Y_train[50000:60000]
 
     print("load data complete")
     return X_train, X_val, X_test, y_train, y_val, y_test
@@ -93,8 +93,8 @@ class Spatial_Coev_GA():
             indices = []
             counter = 0
             for num in np.unique(y_train, return_counts = True)[1]:
-                # for each class of digit, randomly pick 10 images with replacement
-                indices.extend(np.random.randint(counter, counter + num, 10))
+                # for each class of digit, randomly pick 1000 images with replacement
+                indices.extend(np.random.randint(counter, counter + num, 100))
                 counter += num
             self.NNs[ind]["parasite_X_train"] = X_train[indices]
             self.NNs[ind]["parasite_y_train"] = y_train[indices]
@@ -240,11 +240,13 @@ class Spatial_Coev_GA():
         entropy_periter = []
 
         for i in range(len(cf_matrix)):
-            for j in range(len(cf_matrix) - 1):
+            for j in range(len(cf_matrix)):
+                if i >= j:
+                    continue
                 for row in range(10):
                     # add 1e-4 to avoid overflow (division by 0 for log)
                     entropy_periter.append(kl_div(normalize(1e-4+cf_matrix[i], axis=1, norm='l1')[row],
-                                                normalize(1e-4+cf_matrix[j+1], axis=1, norm='l1')[row]))
+                                                normalize(1e-4+cf_matrix[j], axis=1, norm='l1')[row]))
 
         mean_KL = np.average(entropy_periter)
         self.entropy.append(mean_KL)
@@ -337,8 +339,8 @@ def run():
                           host_mut_amount,
                           parasite_mut_rate,
                           parasite_mut_amount)
-        model.entropy_calculator(cf_matrix)
-        model.cosine_sim()
+        # model.entropy_calculator(cf_matrix)
+        # model.cosine_sim()
 
         if i == 0:
             path = model.init_path()
@@ -359,3 +361,4 @@ def run():
 
 if __name__ == "__main__":
     run()
+    
