@@ -19,6 +19,16 @@ import warnings
 warnings.filterwarnings('ignore')
 
 def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
+    """
+    Helper function to load MNIST handwritten digits (Deng, 2012). This function has two purposes:
+    1. load the data
+    2. Divide the datasaet into two parts: training and test dataset.
+
+    Training dataset is useed to trian the model and test dataset is used to check the accuracy.
+    The dataset comes with images and correct labels of the digits.
+    
+    Deng, L., 2012. The mnist database of handwritten digit images for machine learning research. IEEE Signal Processing Magazine, 29(6), pp. 141–142.
+    """
     # load data
     print("\nload data")
 
@@ -46,17 +56,29 @@ def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
 
 class NonSpatial_GA:
   def __init__(self, hid_nodes):
-        self.NNs = {}  # set of models for evolution. Swaps based on training score during evolution. 
-        self.NNs_copy = {}  # for reference during evolution. Does not change during swaps.
-        self.all_train_score = []
-        self.all_val_score = []
-        self.cos_sim = []
-        self.entropy = []
+    """
+    Initialize key attributes for the model:
+    NNs: host algorithm, content is initialized in the birth method.
+    NNS_copy: copy of the host. Referenced during selection, and mutation for repopulation purpose.  
+    all_train_score: keeps global max train accuracy
+    all_val_score: keeps global max validation accuracy
+    all_parasite_score: keeps global MNIST score
+    cos_sim: keeps global genotype score
+    entropy: keeps global phenotype score
+    """
+    self.NNs = {}  # set of models for evolution. Swaps based on training score during evolution. 
+    self.NNs_copy = {}  # for reference during evolution. Does not change during swaps.
+    self.all_train_score = []
+    self.all_val_score = []
+    self.cos_sim = []
+    self.entropy = []
 
   ############## 1. Initialize host algorithm ##############
   def birth(self, population, hid_nodes, X_train, y_train):
       """
       Produce population each individual containing model, training score and validation score attributes.
+      Line 95 and 96 represent the genome of neural networks as genotype
+
       """
       for ind in range(population):
           self.NNs[ind] = {"model": MLPClassifier(hidden_layer_sizes=(hid_nodes,), max_iter=1, alpha=1e-4,
@@ -77,7 +99,10 @@ class NonSpatial_GA:
   # 2.1 calculate fitness for host algorithm
   def fitness(self, X_train, y_train, X_val, y_val):
       """
-      Calculate max score for each generation. Store max score in the array.
+        Calculate max score for the host and paraste in each generation.
+        Also output confusion matrix of host for phenotype measure.
+
+        Fitness for host NN algorithm (line 115): correct classification percentage
       """
       train_score = []
       val_score = []
@@ -102,6 +127,11 @@ class NonSpatial_GA:
   
   # 2.2 select the best performing individuals
   def selection(self):
+    """
+    Select top perfoming individuals.
+    This is a probabilistic replacement where the top performing individuals are proportionately selected.
+    The elitist strategy is from Mitchell (2006), howerver recent suggestions consider diveristy Mouret, J. B. (2020). 
+    """
     self.NNs = dict(sorted(self.NNs.items(), key = lambda NNs:(NNs[1]["train_score"], NNs[0]), reverse=True)) # sort the list for selection
     self.NNs = {i: v for i, v in enumerate(self.NNs.values())}  
     self.NNs_copy = deepcopy(self.NNs) # clone the population
@@ -128,7 +158,11 @@ class NonSpatial_GA:
     # mutation
     # randomly chose loci for mutation
     """
-    check child_coefs.size and prt1.size
+    In each layer, mutate weights at random cites with probability "mut_rate",  Mitchell (2006).
+        ---
+        idx: int
+    line 167: select mutation location
+    line 177 - 178: mutate mut_amount sampled from a normal distribution
     """
     mutate_idx = np.random.choice(child_coefs.size, int(host_mut_rate*child_coefs.size))
     for idx in mutate_idx:
@@ -146,7 +180,9 @@ class NonSpatial_GA:
   # 2.4 combine methods for evolution
   def evolution(self, population, cv_switch, selection_percent, host_mut_rate, host_mut_amount):
     num_selected = int(population * selection_percent)
-    
+    """
+    Combine evolutionary operators. This method is swappable to any other operators.
+    """
     children = [[] for i in range(population)] # sublist for each child
     for i in range(population): # reproduce children until full
       child = []
@@ -161,7 +197,7 @@ class NonSpatial_GA:
   ############## 3.Measure phenotype, genotype and store result ##############
   def entropy_calculator(self, cf_matrix):
         """
-        Compute KL-divergence (distance between metrices) to characterize phenotype
+        Compute KL-divergence (distance between metrices) to characterize phenotype Mitchell (2006).
         normalize each row of the confusion matrix for KL-Divergence calculation
         """
         entropy_periter = []
@@ -180,6 +216,9 @@ class NonSpatial_GA:
         return None
 
   def cosine_sim(self):
+    """
+    Vectorize weights of each host NN into a single genome and meausre the angular difference to capture genotype diveristy.
+    """
     current_div = []
     for ind1 in self.NNs:
       for ind2 in self.NNs:
@@ -207,6 +246,10 @@ class NonSpatial_GA:
 
 def run():
   ############## 1. import hyperparameters ##############
+  """
+    Take in all hyperparameters to initiqalize the genetic population. Additional parasite hyperparameters.
+    Major hyperparameters are from Mitchell (2006). Reference CP193 submission for references.
+  """
   generations = int(input("Enter generations: ")) #10
   population = int(input("Enter population: "))
   hid_nodes = 10 #int(sys.argv[4]) #10

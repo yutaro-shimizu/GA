@@ -21,6 +21,10 @@ import warnings
 warnings.filterwarnings('ignore')
 
 def hyps():
+    """
+    Take in all hyperparameters to initiqalize the genetic population. Additional parasite hyperparameters.
+    Major hyperparameters are from Mitchell (2006). Reference CP193 submission for references.
+    """
     generations = int(input("Enter generations: ")) #10
     population = int(input("Enter population: ")) #10
     rou_switch = 0 #int(sys.argv[3])
@@ -42,6 +46,16 @@ def hyps():
     return generations, population, rou_switch, hid_nodes, host_mut_rate, host_mut_amount, parasite_mut_rate, parasite_mut_amount, visualize, visualize_per
 
 def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
+    """
+    Helper function to load MNIST handwritten digits (Deng, 2012). This function has two purposes:
+    1. load the data
+    2. Divide the datasaet into two parts: training and test dataset.
+
+    Training dataset is useed to trian the model and test dataset is used to check the accuracy.
+    The dataset comes with images and correct labels of the digits.
+    
+    Deng, L., 2012. The mnist database of handwritten digit images for machine learning research. IEEE Signal Processing Magazine, 29(6), pp. 141–142.
+    """
     # load data
     print("load data")
 
@@ -69,6 +83,16 @@ def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
 
 class NonSpatial_Coev_GA:
     def __init__(self, hid_nodes):
+        """
+        Initialize key attributes for the model:
+        NNs: host algorithm, content is initialized in the birth method.
+        NNS_copy: copy of the host. Referenced during selection, and mutation for repopulation purpose.  
+        all_train_score: keeps global max train accuracy
+        all_val_score: keeps global max validation accuracy
+        all_parasite_score: keeps global MNIST score
+        cos_sim: keeps global genotype score
+        entropy: keeps global phenotype score
+        """
         self.NNs = {} # set of models for evolution. Swaps based on training score during evolution. 
         self.NNs_copy = {}  # for reference during evolution. Does not change during swaps.
         self.all_train_score = []
@@ -89,6 +113,8 @@ class NonSpatial_Coev_GA:
 
             and
             - parasites (10 digits from each class)
+
+        Line 135 and 136 represent the genome of neural networks as genotype
         """
         for ind in range(population):
             self.NNs[ind] = {"model": MLPClassifier(hidden_layer_sizes=(hid_nodes,), 
@@ -114,7 +140,7 @@ class NonSpatial_Coev_GA:
             counter = 0
             for num in np.unique(y_train, return_counts = True)[1]:
                 # for each class of digit, randomly pick 1000 images with replacement
-                indices.extend(np.random.randint(counter, counter + num, 100))
+                indices.extend(np.random.randint(counter, counter + num, 50))
                 counter += num
             self.NNs[ind]["parasite_X_train"] = X_train[indices]
             self.NNs[ind]["parasite_y_train"] = y_train[indices]
@@ -123,8 +149,11 @@ class NonSpatial_Coev_GA:
     # 2.1 calculate fitness for host
     def fitness (self, X_train, y_train, X_val, y_val, population):
         """
-        Calculate max score for each generation. Store max score in the array.
-        Also calculate confusion matrix.
+        Calculate max score for the host and paraste in each generation.
+        Also output confusion matrix of host for phenotype measure.
+
+        Fitness for host NN algorithm (line 166 and line 169): correct classification percentage
+        Fitness for host MNIST algoirithm (line 180 and line 181): misclassifiation percentage
         """
         train_score = []
         val_score = []
@@ -165,6 +194,12 @@ class NonSpatial_Coev_GA:
 
     # 2.2 select the best performing hot and parasite
     def selection(self, host_par_score, host_par_model, population):
+        """
+        Select top perfoming individuals.
+
+        This is a probabilistic replacement where the top performing individuals are proportionately selected.
+        The elitist strategy is from Mitchell (2006), howerver recent suggestions consider diveristy Mouret, J. B. (2020). 
+        """
         # make an array w prob. distribution
         all_scores = []
         # extract score from the model
@@ -181,10 +216,12 @@ class NonSpatial_Coev_GA:
     # 2.3 mutation both host and parasite
     def mutation_host(self, idx, mut_rate=0.5, mut_amount=0.005):
         """
-        In each layer, mutate weights at random cites with probability "mut_rate"
+        In each layer, mutate weights at random cites with probability "mut_rate", Mitchell (2006).
         ---
         idx: int
 
+        line 228 -line 230: select mutation location
+        line 233 - line 235: mutate mut_amount sampled from a normal distribution
         """
         for i in range(2):
             # randomly select mutation sites
@@ -199,6 +236,14 @@ class NonSpatial_Coev_GA:
         return None
     
     def mutation_parasite(self, idx, mut_rate=0.5, mut_amount=10):
+        """
+        Mutate weights at random cites with probability "mut_rate", Mitchell (2006).
+        ---
+        idx: int
+
+        line 249 -line 250: select mutation location
+        line 253 - line 254: mutate mut_amount sampled from a normal distribution
+        """
         for image in self.NNs[idx]["parasite_X_train"]:
             # randomly select mutation sites
             shape = image.shape[0]
@@ -211,6 +256,9 @@ class NonSpatial_Coev_GA:
 
     # 2.4 combine methods to coevolve the population
     def coevolution(self, population, host_mut_rate, host_mut_amount, parasite_mut_rate, parasite_mut_amount):
+        """
+        Combine evolutionary operators. This method is swappable to any other operators.
+        """
         # selection/migration
         self.selection("val_score", ["model"], population)
         self.selection("parasite_score", ["parasite_X_train", "parasite_y_train"], population)
@@ -224,7 +272,7 @@ class NonSpatial_Coev_GA:
     ############## 3.Measure phenotype, genotype and store result ##############
     def entropy_calculator(self, cf_matrix):
         """
-        Compute KL-divergence (distance between metrices) to characterize phenotype
+        Compute KL-divergence (distance between metrices) to characterize phenotype Mitchell 2006.
         normalize each row of the confusion matrix for KL-Divergence calculation
         """
         entropy_periter = []
@@ -245,6 +293,9 @@ class NonSpatial_Coev_GA:
         return None
 
     def cosine_sim(self):
+        """
+        Vectorize weights of each host NN into a single genome and meausre the angular difference to capture genotype diveristy.
+        """
         current_div = []
         for ind1 in self.NNs:
             for ind2 in self.NNs:
