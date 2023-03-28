@@ -52,8 +52,8 @@ def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
     X_test = data_test[:, 1:q]  # rest of data
 
     #next two lines are taking 10,000 samples from MNIST
-    X_train, X_val = X_train[:50000], X_train[50000:60000]
-    y_train, y_val = Y_train[:50000], Y_train[50000:60000]
+    X_train, X_val = X_train[:50000], X_train[50111:50223]
+    y_train, y_val = Y_train[:50000], Y_train[50111:50223]
 
     print("load data complete")
     return X_train, X_val, X_test, y_train, y_val, y_test
@@ -117,8 +117,8 @@ class Spatial_Coev_GA():
             indices = []
             counter = 0
             for num in np.unique(y_train, return_counts = True)[1]:
-                # for each class of digit, randomly pick 1000 images with replacement
-                indices.extend(np.random.randint(counter, counter + num, 50))
+                # for each grid, load 110 digit
+                indices.extend(np.random.randint(counter, counter + num, 11))
                 counter += num
             self.NNs[ind]["parasite_X_train"] = X_train[indices]
             self.NNs[ind]["parasite_y_train"] = y_train[indices]
@@ -381,13 +381,13 @@ def run():
                           host_mut_amount,
                           parasite_mut_rate,
                           parasite_mut_amount)
-        # model.entropy_calculator(cf_matrix)
-        # model.cosine_sim()
+        model.entropy_calculator(cf_matrix)
+        model.cosine_sim()
 
         if i == 0:
             path = model.init_path()
-        if i % visualize_per == 0:
-            model.mnist_visualizer(path, i)
+        # if i % visualize_per == 0:
+        #     model.mnist_visualizer(path, i)
 
     model.store_result([generations,
                         dimension,
