@@ -74,9 +74,9 @@ def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
     y_test = data_test[:, 0]    # first row of data
     X_test = data_test[:, 1:q]  # rest of data
 
-    #next two lines are taking 10,000 samples from MNIST
-    X_train, X_val = X_train[:50000], X_train[50000:60000]
-    y_train, y_val = Y_train[:50000], Y_train[50000:60000]
+    #next two lines are taking 1,000 samples from MNIST
+    X_train, X_val = X_train[:1000], X_train[1000:2000]
+    y_train, y_val = Y_train[:1000], Y_train[1000:2000]
 
     print("load data complete")
     return X_train, X_val, X_test, y_train, y_val, y_test
@@ -178,7 +178,7 @@ class NonSpatial_Coev_GA:
 
             ### compute parasite score ###
             true_result = current_mlp["parasite_y_train"] == y_train_pred
-            current_mlp["parasite_score"]  = 1 - (sum(true_result) / population)
+            current_mlp["parasite_score"]  = 1 - (sum(true_result) / len(true_result))
 
             parasite_score.append(current_mlp["parasite_score"])
 
@@ -318,7 +318,7 @@ class NonSpatial_Coev_GA:
 
         return path
 
-    def store_result(self, hyp_params, now, path):
+    def store_result(self, hyp_params, path):
         d = {"train_score":self.all_train_score,
         "val_score":self.all_val_score,
         "parasite_score":self.all_parasite_score,
@@ -326,8 +326,8 @@ class NonSpatial_Coev_GA:
         "rel_ent":self.entropy,
         "hyp_params":hyp_params}
         df = pd.DataFrame(dict([ (k,pd.Series(v)) for k,v in d.items() ]))
-        df.to_csv(path+f"/result_nonspatial_coev{now}.csv")
-        print(f"result stored as: result_nonspatial_coev{now}.csv")
+        df.to_csv(path+f"/result_nonspatial_coev.csv")
+        print(f"result stored as: result_nonspatial_coev.csv")
         return None
 
     def mnist_visualizer(self, path, iter):
@@ -357,8 +357,8 @@ def run():
         print("\ncurrent generation: ", i)
         val_score, cf_matrix = model.fitness(X_train, y_train, X_val, y_val, population)
         model.coevolution(population, host_mut_rate, host_mut_amount, parasite_mut_rate, parasite_mut_amount)
-        # model.entropy_calculator(cf_matrix)
-        # model.cosine_sim()
+        model.entropy_calculator(cf_matrix)
+        model.cosine_sim()
 
         if i == 0:
             path = model.init_path()
@@ -373,7 +373,7 @@ def run():
                     host_mut_rate,
                     host_mut_amount,
                     parasite_mut_rate,
-                    parasite_mut_amount])
+                    parasite_mut_amount],path)
     return None
 
 if __name__=="__main__":

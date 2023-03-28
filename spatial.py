@@ -50,8 +50,8 @@ def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
     X_test = data_test[:, 1:q]  # rest of data
 
     #next two lines are taking 10,000 samples from MNIST
-    X_train, X_val = X_train[:500], X_train[500:10500]
-    y_train, y_val = Y_train[:500], Y_train[500:10500]
+    X_train, X_val = X_train[:50000], X_train[50111:50223]
+    y_train, y_val = Y_train[:50000], Y_train[50111:50223]
 
     print("load data complete")
     return X_train, X_val, X_test, y_train, y_val, y_test
@@ -88,11 +88,24 @@ class Spatial_GA:
             self.NNs[ind] = {"model": MLPClassifier(hidden_layer_sizes=(hid_nodes,), max_iter=1, alpha=1e-4,
                           solver='sgd', verbose=False, learning_rate_init=.1),
                         "train_score": 0,
-                        "val_score": 0}
+                        "val_score": 0,
+                        "parasite_X_train": None,
+                        "parasite_y_train": None,
+                        "parasite_score": 0}                        
             self.NNs[ind]["model"].fit(X_train, y_train) # fit the network to initialize W and b
             # randomly initialize weights and biases
             self.NNs[ind]["model"].coefs_[0] = np.random.uniform(low=-1, high=1, size=(784, hid_nodes)) 
             self.NNs[ind]["model"].coefs_[1] = np.random.uniform(low=-1, high=1, size=(hid_nodes, 10))
+
+            ### 1.2 populate parasite (MNIST handwritten digits) ###
+            indices = []
+            counter = 0
+            for num in np.unique(y_train, return_counts = True)[1]:
+                # for each grid, load 110 digit
+                indices.extend(np.random.randint(counter, counter + num, 11))
+                counter += num
+            self.NNs[ind]["parasite_X_train"] = X_train[indices]
+            self.NNs[ind]["parasite_y_train"] = y_train[indices]
 
     ############## 2.Run Non-spatial coevolution ##############
     # 2.1 calculate fitness for host
@@ -108,7 +121,7 @@ class Spatial_GA:
         cf_matrix = []
 
         for ind in self.NNs:
-            self.NNs[ind]["train_score"]= self.NNs[ind]["model"].score(X_train, y_train) # calculate the score
+            self.NNs[ind]["train_score"]= self.NNs[ind]["model"].score(self.NNs[ind]["parasite_X_train"], self.NNs[ind]["parasite_y_train"]) # calculate the score
             self.NNs[ind]["val_score"]= self.NNs[ind]["model"].score(X_val, y_val)
             train_score.append(self.NNs[ind]["train_score"])
             val_score.append(self.NNs[ind]["val_score"])
@@ -184,7 +197,7 @@ class Spatial_GA:
         for i in range(dim): # for every row
             for j in range(dim): #for every column
                 idx = i*dim+j # convert row and column notations to an index 
-                self.NNs[idx] = deepcopy(self.NNs_copy[self.identify_max_neighbor(i, j, dim, neigh_size, rou_switch)])
+                self.NNs[idx]["model"] = deepcopy(self.NNs_copy[self.identify_max_neighbor(i, j, dim, neigh_size, rou_switch)]["model"])
                 self.mutate(idx, host_mut_rate, host_mut_amount)
    
     ############## 3.Measure phenotype, genotype and store result ##############

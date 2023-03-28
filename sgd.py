@@ -24,8 +24,8 @@ def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
     X_test = data_test[:, 1:q]  # rest of data
 
     #next two lines are taking 10,000 samples from MNIST
-    X_train, X_val = X_train[:10000], X_train[10000:20000]
-    y_train, y_val = Y_train[:10000], Y_train[10000:20000]
+    X_train, X_val = X_train[:1000], X_train[10000:11000]
+    y_train, y_val = Y_train[:1000], Y_train[10000:11000]
 
     print("load data complete")
     return X_train, X_val, X_test, y_train, y_val, y_test
@@ -34,8 +34,7 @@ X_train, X_val, X_test, y_train, y_val, y_test = load_data()
 # stochastic gradient descent
 
 ### check the size of layers: 1 hidden layer w 50 nodes
-mlp = MLPClassifier(hidden_layer_sizes=(10, ), max_iter=10, alpha=1e-4, 
-                    solver='sgd', verbose=10, random_state=1, learning_rate_init=.1)
+mlp = MLPClassifier(hidden_layer_sizes=(10), max_iter=300)
 mlp.fit(X_train, y_train)
 print(len(mlp.predict(X_val)))
 

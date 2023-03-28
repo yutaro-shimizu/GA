@@ -156,7 +156,7 @@ class Spatial_Coev_GA():
 
             ### compute parasite score ###
             true_result = current_mlp["parasite_y_train"] == y_train_pred
-            current_mlp["parasite_score"]  = 1 - (sum(true_result) / population)
+            current_mlp["parasite_score"]  = 1 - (sum(true_result) / len(true_result))
 
             parasite_score.append(current_mlp["parasite_score"])
 
