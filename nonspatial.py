@@ -48,8 +48,8 @@ def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
     X_test = data_test[:, 1:q]  # rest of data
 
     #next two lines are taking 10,000 samples from MNIST
-    X_train, X_val = X_train[:1000], X_train[1000:11000]
-    y_train, y_val = Y_train[:1000], Y_train[1000:11000]
+    X_train, X_val = X_train[:1000], X_train[1000:2000]
+    y_train, y_val = Y_train[:1000], Y_train[1000:2000]
 
     print("load data complete")
     return X_train, X_val, X_test, y_train, y_val, y_test
