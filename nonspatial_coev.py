@@ -4,6 +4,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import confusion_matrix
 from sklearn.preprocessing import normalize
 from scipy.special import kl_div
+from scipy.special import softmax
 from scipy.misc import face
 from scipy.spatial import distance
 from copy import deepcopy
