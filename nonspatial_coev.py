@@ -313,7 +313,7 @@ class NonSpatial_Coev_GA:
 
     def init_path(self):
         now = datetime.now().strftime("%y%m%d%H%M%S")
-        path = f"./results/spatial_coev{now}"
+        path = f"./results/nonspatial_coev{now}"
         os.mkdir(path)
 
         return path
