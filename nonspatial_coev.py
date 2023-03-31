@@ -357,8 +357,8 @@ def run():
         print("\ncurrent generation: ", i)
         val_score, cf_matrix = model.fitness(X_train, y_train, X_val, y_val, population)
         model.coevolution(population, host_mut_rate, host_mut_amount, parasite_mut_rate, parasite_mut_amount)
-        # model.entropy_calculator(cf_matrix)
-        # model.cosine_sim()
+        model.entropy_calculator(cf_matrix)
+        model.cosine_sim()
 
         if i == 0:
             path = model.init_path()
