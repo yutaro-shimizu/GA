@@ -381,8 +381,8 @@ def run():
                           host_mut_amount,
                           parasite_mut_rate,
                           parasite_mut_amount)
-        model.entropy_calculator(cf_matrix)
-        model.cosine_sim()
+        # model.entropy_calculator(cf_matrix)
+        # model.cosine_sim()
 
         if i == 0:
             path = model.init_path()
