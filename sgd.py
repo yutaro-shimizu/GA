@@ -24,8 +24,8 @@ def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
     X_test = data_test[:, 1:q]  # rest of data
 
     #next two lines are taking 10,000 samples from MNIST
-    X_train, X_val = X_train[:1000], X_train[10000:11000]
-    y_train, y_val = Y_train[:1000], Y_train[10000:11000]
+    X_train, X_test = X_train[:10000], X_train[10000:11000]
+    y_train, y_test = Y_train[:10000], Y_train[10000:11000]
 
     print("load data complete")
     return X_train, X_val, X_test, y_train, y_val, y_test
@@ -33,12 +33,26 @@ def load_data(train_csv='mnist_train.csv',test_csv='mnist_test.csv'):
 X_train, X_val, X_test, y_train, y_val, y_test = load_data()
 # stochastic gradient descent
 
-### check the size of layers: 1 hidden layer w 50 nodes
-mlp = MLPClassifier(hidden_layer_sizes=(10), max_iter=300)
-mlp.fit(X_train, y_train)
-print(len(mlp.predict(X_val)))
+train_lst = []
+test_lst = []
+for i in range(30):
+    ### check the size of layers: 1 hidden layer w 50 nodes
+    mlp = MLPClassifier(hidden_layer_sizes=(10), max_iter=300)
+    mlp.fit(X_train, y_train)
+    print(len(mlp.predict(X_val)))
 
-print(f"Training set score: {mlp.score(X_train, y_train):.3f}")
-print(f"Test set score: {mlp.score(X_test, y_test):.3f}")
+    train_score = mlp.score(X_train, y_train)
+    test_score =  mlp.score(X_test, y_test)
+
+    print(f"Training set score: {train_score:.3f}")
+    print(f"Test set score: {test_score:.3f}")
+
+    train_lst.append(train_score)
+    test_lst.append(test_score)
+
+print(train_lst)
+print(test_lst)
 
 plt.show()
+
+#
