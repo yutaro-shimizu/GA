@@ -322,6 +322,7 @@ class NonSpatial_Coev_GA:
         d = {"train_score":self.all_train_score,
         "val_score":self.all_val_score,
         "parasite_score":self.all_parasite_score,
+        "mnist_score":self.all_parasite_score,
         "cos_sim":self.cos_sim,
         "rel_ent":self.entropy,
         "hyp_params":hyp_params}
